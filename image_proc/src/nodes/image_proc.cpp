@@ -36,6 +36,10 @@
 #include <nodelet/loader.h>
 #include <image_proc/advertisement_checker.h>
 
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/highgui/highgui.hpp>
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "image_proc");
@@ -57,6 +61,11 @@ int main(int argc, char **argv)
 
   // Shared parameters to be propagated to nodelet private namespaces
   ros::NodeHandle private_nh("~");
+
+  cv::namedWindow("view1");
+  cv::namedWindow("view2");
+  cv::startWindowThread(); // recommended
+  
   XmlRpc::XmlRpcValue shared_params;
   int queue_size;
   if (private_nh.getParam("queue_size", queue_size))
@@ -93,5 +102,6 @@ int main(int argc, char **argv)
   check_inputs.start(topics, 60.0);
   
   ros::spin();
+  cv::destroyWindow("view");
   return 0;
 }
