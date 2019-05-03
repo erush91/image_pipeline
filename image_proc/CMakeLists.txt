@@ -37,6 +37,7 @@ add_library(${PROJECT_NAME} src/libimage_proc/processor.cpp
                                 src/nodelets/edge_aware.cpp
                                 src/nodelets/crop_non_zero.cpp
 				src/nodelets/scan.cpp
+                                src/nodelets/stopsign.cpp
 )
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${OpenCV_LIBRARIES})
