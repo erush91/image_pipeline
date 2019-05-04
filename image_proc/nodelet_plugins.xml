@@ -42,6 +42,14 @@
     </description>
   </class>
 
+  <class name="image_proc/stopsign"
+         type="image_proc::StopSignNodelet"
+         base_class_type="nodelet::Nodelet">
+    <description>
+      Nodelet to detect a stop sign.
+    </description>
+  </class>
+
   <!-- Deprecated Nodelet API -->
   <class name="image_proc/crop_nonZero"
 	 type="image_proc::CropNonZeroNodelet"
