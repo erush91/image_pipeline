@@ -62,21 +62,12 @@ class StopSignNodelet : public nodelet::Nodelet
 {
   // ROS communication
   boost::shared_ptr<image_transport::ImageTransport> it_in_, it_out_;
-<<<<<<< HEAD
   image_transport::Subscriber sub_;
-=======
-  image_transport::CameraSubscriber sub_;
->>>>>>> b4ce56b6d189db643386a029d51c3638e0a5fc54
   int queue_size_;
   std::string target_frame_id_;
 
   boost::mutex connect_mutex_;
-<<<<<<< HEAD
   ros::Publisher pub_stop_sign_;
-=======
-  image_transport::CameraPublisher pub_h_scans_;
-    ros::Publisher pub_stop_sign_;// image_transport::Publisher pub_stop_sign_;
->>>>>>> b4ce56b6d189db643386a029d51c3638e0a5fc54
 
   // Dynamic reconfigure
   boost::recursive_mutex config_mutex_;
@@ -89,12 +80,7 @@ class StopSignNodelet : public nodelet::Nodelet
 
   void connectCb();
 
-<<<<<<< HEAD
   void imageCb(const sensor_msgs::ImageConstPtr& image_msg);
-=======
-  void imageCb(const sensor_msgs::ImageConstPtr& image_msg,
-               const sensor_msgs::CameraInfoConstPtr& info_msg);
->>>>>>> b4ce56b6d189db643386a029d51c3638e0a5fc54
 
   void configCb(Config &config, uint32_t level);
 
@@ -117,41 +103,12 @@ void StopSignNodelet::onInit()
   reconfigure_server_.reset(new ReconfigureServer(config_mutex_, private_nh));
   ReconfigureServer::CallbackType f = boost::bind(&StopSignNodelet::configCb, this, _1, _2);
   reconfigure_server_->setCallback(f);
-<<<<<<< HEAD
   image_transport::TransportHints hints("raw", ros::TransportHints(), getPrivateNodeHandle());
   sub_ = it_in_->subscribe("image_raw", queue_size_, &StopSignNodelet::imageCb, this, hints);
   pub_stop_sign_ = nh.advertise<std_msgs::Bool>("stop_sign",  10);
 }
 
 void StopSignNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg)
-=======
-
-  // Monitor whether anyone is subscribed to the h_scans
-  image_transport::SubscriberStatusCallback connect_cb = boost::bind(&StopSignNodelet::connectCb, this);
-  ros::SubscriberStatusCallback connect_cb_info = boost::bind(&StopSignNodelet::connectCb, this);
-
-  // Make sure we don't enter connectCb() between advertising and assigning to pub_h_scans_
-  boost::lock_guard<boost::mutex> lock(connect_mutex_);
-  pub_h_scans_ = it_out_->advertiseCamera("h_scans",  1, connect_cb, connect_cb, connect_cb_info, connect_cb_info);
-  pub_stop_sign_ = nh.advertise<std_msgs::Bool>("stop_sign",  10);
-}
-
-// Handles (un)subscribing when clients (un)subscribe
-void StopSignNodelet::connectCb()
-{
-  boost::lock_guard<boost::mutex> lock(connect_mutex_);
-  if (pub_h_scans_.getNumSubscribers() == 0)
-    sub_.shutdown();
-  else if (!sub_)
-  {
-    image_transport::TransportHints hints("raw", ros::TransportHints(), getPrivateNodeHandle());
-    sub_ = it_in_->subscribeCamera("image_raw", queue_size_, &StopSignNodelet::imageCb, this, hints);
-  }
-}
-
-void StopSignNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
-                                  const sensor_msgs::CameraInfoConstPtr& info_msg)
->>>>>>> b4ce56b6d189db643386a029d51c3638e0a5fc54
 {
   Config config;
   {
@@ -171,11 +128,7 @@ void StopSignNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
   Mat mask_red_orange, mask_red_pink, mask;
   
   // Masking colors (low end of Hue - red orange)
-<<<<<<< HEAD
   inRange(img_hsv, Scalar(  0, 75, 75), Scalar(  2, 255, 255), mask_red_orange);
-=======
-  inRange(img_hsv, Scalar(  0, 75, 75), Scalar(  2,255, 255), mask_red_orange);
->>>>>>> b4ce56b6d189db643386a029d51c3638e0a5fc54
 
   // Masking colors (high end of Hue - red pink)
   inRange(img_hsv, Scalar(178, 75, 75), Scalar(180, 255, 255), mask_red_pink);
