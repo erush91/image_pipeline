@@ -46,6 +46,13 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
 
+#include <image_proc/FourierCoefsMsg.h>
+
+#include <std_msgs/Bool.h>
+#include <geometry_msgs/Twist.h>
+#include <std_msgs/Float32MultiArray.h>
+
+
 namespace image_proc {
 
 using namespace cv_bridge; // CvImage, toCvShare
@@ -57,10 +64,12 @@ class ScanNodelet : public nodelet::Nodelet
   image_transport::CameraSubscriber sub_;
   int queue_size_;
   std::string target_frame_id_;
-
   boost::mutex connect_mutex_;
   image_transport::CameraPublisher pub_h_scans_;
-  image_transport::CameraPublisher pub_h_scan_;
+  ros::Publisher pub_h_scan_;
+  ros::Publisher pub_h_nearness_; 
+  ros::Publisher pub_wfi_fourier_;
+  ros::Publisher pub_wfi_control_command_;
 
   // Dynamic reconfigure
   boost::recursive_mutex config_mutex_;
@@ -100,29 +109,40 @@ void ScanNodelet::onInit()
   // Monitor whether anyone is subscribed to the h_scans
   image_transport::SubscriberStatusCallback connect_cb = boost::bind(&ScanNodelet::connectCb, this);
   ros::SubscriberStatusCallback connect_cb_info = boost::bind(&ScanNodelet::connectCb, this);
+
   // Make sure we don't enter connectCb() between advertising and assigning to pub_h_scans_
   boost::lock_guard<boost::mutex> lock(connect_mutex_);
+  image_transport::TransportHints hints("raw", ros::TransportHints(), getPrivateNodeHandle());
+  sub_ = it_in_->subscribeCamera("image_raw", queue_size_, &ScanNodelet::imageCb, this, hints);
+
+  // Publisher rows of depth image used in horizontal line scan
   pub_h_scans_ = it_out_->advertiseCamera("h_scans",  1, connect_cb, connect_cb, connect_cb_info, connect_cb_info);
-  pub_h_scan_ = it_out_->advertiseCamera("h_scan",  1, connect_cb, connect_cb, connect_cb_info, connect_cb_info);
+  
+  // Publisher horizontal line scan
+  pub_h_scan_ = nh.advertise<std_msgs::Float32MultiArray>("h_scan", 10);
+
+  // Publisher horizontal nearnes
+  pub_h_nearness_ = nh.advertise<std_msgs::Float32MultiArray>("h_nearness", 10);
+
+  // Publisher Fourier coefficients
+  pub_wfi_fourier_ = nh.advertise<image_proc::FourierCoefsMsg>("wfi_fourier_coefficients", 10);
+
+  // Publisher WFI control command
+  pub_wfi_control_command_ = nh.advertise<geometry_msgs::Twist>("wfi_control_command", 10);
   
 }
 
-// Handles (un)subscribing when clients (un)subscribe
-void ScanNodelet::connectCb()
-{
-  boost::lock_guard<boost::mutex> lock(connect_mutex_);
-  if (pub_h_scans_.getNumSubscribers() == 0 && pub_h_scan_.getNumSubscribers() == 0)
-    sub_.shutdown();
-  else if (!sub_)
-  {
-    image_transport::TransportHints hints("raw", ros::TransportHints(), getPrivateNodeHandle());
-    sub_ = it_in_->subscribeCamera("image_raw", queue_size_, &ScanNodelet::imageCb, this, hints);
-  }
-}
+// Handles (un)subscribing when clients (un)subscribe;
+void ScanNodelet::connectCb(){}
 
 void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
-                                  const sensor_msgs::CameraInfoConstPtr& info_msg)
+                          const sensor_msgs::CameraInfoConstPtr& info_msg)
 {
+
+//////////////////////////////////////////////////////////////////////////
+// PROCESS DEPTH IMAGE ///////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+
   /// @todo Check image dimensions match info_msg
   /// @todo Publish tweaks to config_ so they appear in reconfigure_gui
 
@@ -154,9 +174,9 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
   h_scans_float.image = source->image(cv::Rect(config.x_offset, config.y_offset, width, height));
   h_scan.image = source->image(cv::Rect(config.x_offset, config.y_offset, width, 1));
 
-  ////////////////////////////////////
-  // CALCULATE HORIZONTAL LINE SCAN //
-  ////////////////////////////////////
+////////////////////////////////////
+// CALCULATE HORIZONTAL LINE SCAN //
+////////////////////////////////////
 
   // Convert to from 2 bytes (16 bit) to float, and scale from mm to m
   h_scans.image.convertTo(h_scans_float.image, CV_32FC1,0.001); // [mm] --> [m]
@@ -164,8 +184,6 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
   cv::Mat row_mean;
   cv::Mat col_mean;
   reduce(h_scans_float.image, h_scan.image, 0, CV_REDUCE_AVG, CV_32FC1); // 0 = AVERAGE COLUMNS
-
-  // std::cout << h_scan.image << std::endl;
 
   // Create h_scans Image message
   sensor_msgs::ImagePtr out_h_scans = h_scans.toImageMsg();
@@ -184,17 +202,269 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
   
   // If no ROI specified, leave do_rectify as-is. If ROI specified, set do_rectify = true.
   if (width != (int)image_msg->width || height != (int)image_msg->height)
+  {
     out_info->roi.do_rectify = true;
+  }
 
-  if (!target_frame_id_.empty()) {
+  if (!target_frame_id_.empty())
+  {
     out_h_scans->header.frame_id = target_frame_id_;
     out_info->header.frame_id = target_frame_id_;
   }
 
   pub_h_scans_.publish(out_h_scans, out_info);
-  pub_h_scan_.publish(out_h_scan, out_info);
 
+  ////////////////////////////////////
+  // Saturate horizontal depth scan //
+  ////////////////////////////////////
+
+  cv::Mat depth_sat = cv::Mat::zeros(cv::Size(1, 580), CV_32FC1);
+  depth_sat = h_scan.image;
+
+  depth_sat.setTo(0.5, depth_sat < 0.5);
+  depth_sat.setTo(10, depth_sat > 10);
   
+  /////////////////////////////////
+  // Publish WFI horizontal scan //
+  /////////////////////////////////
+
+  std::vector<float> h_scan_array(depth_sat.begin<float>(), depth_sat.end<float>());
+
+  std_msgs::Float32MultiArray h_scan_msg;
+  h_scan_msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
+  h_scan_msg.layout.dim[0].size = h_scan_array.size();
+  h_scan_msg.data.clear();
+  h_scan_msg.data.insert(h_scan_msg.data.end(), h_scan_array.begin(), h_scan_array.end());
+
+  pub_h_scan_.publish(h_scan_msg);
+
+//////////////////////////////////////////////////////////////////////////
+// CALCULATE WIDE FIELD INTEGRATION //////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+
+  ///////////////////////
+  // Declare variables //
+  ///////////////////////
+  float dg;
+  int num_points;
+  num_points = 580;
+  int num_fourier_terms;
+  num_fourier_terms = 4;
+  float fourier_terms;
+  for (int i = 1; i < num_fourier_terms + 1; i++)
+  {
+    fourier_terms = i;
+  }
+  float gamma_arr[num_points];
+  float cos_gamma_arr[num_fourier_terms][num_points];
+  float sin_gamma_arr[num_fourier_terms][num_points];
+  float a_0, a[num_fourier_terms], b[num_fourier_terms];
+
+  float gamma_start_FOV;
+  float gamma_end_FOV;
+  float gamma_range_FOV;
+  float gamma_delta_FOV;
+ 
+  /////////////////////////
+  // Intialize variables //
+  /////////////////////////
+  gamma_start_FOV = -0.25 * M_PI;
+  gamma_end_FOV = 0.25 * M_PI;
+  gamma_range_FOV = gamma_end_FOV - gamma_start_FOV;
+  gamma_delta_FOV = gamma_range_FOV / num_points;
+  
+  ///////////////////////////////////
+  // Calculate horizontal nearness //
+  ///////////////////////////////////
+  
+  cv::Mat nearness = cv::Mat::zeros(cv::Size(1, 580), CV_32FC1);
+
+  nearness = 1.0 / depth_sat;
+
+  /////////////////////////////////////
+  // Publish WFI horizontal nearness //
+  /////////////////////////////////////
+
+  std::vector<float> nearness_array(nearness.begin<float>(), nearness.end<float>());
+  
+  std_msgs::Float32MultiArray nearness_msg;
+  nearness_msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
+  nearness_msg.layout.dim[0].size = nearness_array.size();
+  nearness_msg.data.clear();
+  nearness_msg.data.insert(nearness_msg.data.end(), nearness_array.begin(), nearness_array.end());
+
+  pub_h_nearness_.publish(nearness_msg);
+
+  cv::Mat cos_gamma_mat(num_fourier_terms + 1, num_points, CV_32FC1, cos_gamma_arr);
+  cv::Mat sin_gamma_mat(num_fourier_terms + 1, num_points, CV_32FC1, sin_gamma_arr);
+
+  ////////////////////////////////////
+  // Calculate Fourier coefficients //
+  ////////////////////////////////////
+  for (int i = 0; i < num_fourier_terms + 1; i++)
+  {
+    for (int j = 0; j < num_points; j++)
+    {
+      gamma_arr[j] = gamma_start_FOV + gamma_delta_FOV * j;
+      cos_gamma_arr[i][j] = cos(i * gamma_arr[j]);
+      sin_gamma_arr[i][j] = sin(i * gamma_arr[j]);
+    }
+    
+    if(i == 0)
+    {
+      a_0 = nearness.dot(cos_gamma_mat.row(i)) * gamma_delta_FOV / (0.5 * gamma_range_FOV);
+    }
+    else if(i > 0)
+    {
+      a[i-1] = nearness.dot(cos_gamma_mat.row(i)) * gamma_delta_FOV / (0.5 * gamma_range_FOV);
+      b[i-1] = nearness.dot(sin_gamma_mat.row(i)) * gamma_delta_FOV / (0.5 * gamma_range_FOV);
+    }
+  }
+
+  // /////////////////////////
+  // // Print cos_gamma_arr //
+  // /////////////////////////
+  // std::cout << "cos_gamma_arr = [";
+  // for (int i = 0; i < num_fourier_terms; i++)
+  // {
+  //   std::cout << "[";
+  //   for (int j = 0; j < num_points; j++)
+  //   {
+  //     std::cout << cos_gamma_arr[i][j] << ",";
+  //   }
+  //   std::cout << "]" << std::endl;
+  // }
+  // std::cout << "]" << std::endl;  
+
+  // /////////////////////////
+  // // Print sin_gamma_arr //
+  // /////////////////////////
+  // std::cout << "sin_gamma_arr = [";
+  // for (int i = 0; i < num_fourier_terms; i++)
+  // {
+  //   std::cout << "[";
+  //   for (int j = 0; j < num_points; j++)
+  //   {
+  //     std::cout << sin_gamma_arr[i][j] << ",";
+  //   }
+  //   std::cout << "]" << std::endl;
+  // }
+  // std::cout << "]" << std::endl;  
+  
+  // //////////////////////////////////////////
+  // // Print Fourier cosine coefficients, a //
+  // //////////////////////////////////////////
+  // std::cout << "a = [";
+  // for (int i = 0; i < num_fourier_terms + 1; i++)
+  // {
+  //   std::cout << a[i] << ",";  
+  // }
+  // std::cout << "]" << std::endl;
+
+  // ////////////////////////////////////////
+  // // Print Fourier sine coefficients, b //
+  // ////////////////////////////////////////
+  // std::cout << "b = [";
+  // for (int i = 0; i < num_fourier_terms + 1; i++)
+  // {
+  //   std::cout << b[i] << ",";  
+  // }
+  // std::cout << "]" << std::endl;
+
+  // ////////////////////
+  // // Print nearness //
+  // ////////////////////
+  // std::cout << "nearness = ";
+  // std::cout << nearness << std::endl;
+
+  //////////////////////////////////////
+  // Publish WFI Fourier coefficients //
+  //////////////////////////////////////
+
+  // Convert array to vector
+  std::vector<float> a_vector(a, a + sizeof a / sizeof a[0]);
+  std::vector<float> b_vector(b, b + sizeof b / sizeof b[0]);
+
+  image_proc::FourierCoefsMsg wfi_ctrl_cmd_msg;
+
+  wfi_ctrl_cmd_msg.header.stamp = ros::Time::now();
+  wfi_ctrl_cmd_msg.a_0 = a_0;
+  wfi_ctrl_cmd_msg.a = a_vector;
+  wfi_ctrl_cmd_msg.b = b_vector;
+
+  pub_wfi_fourier_.publish(wfi_ctrl_cmd_msg);
+
+  ////////////////////////////////////////
+  // Calculate forward velocity command //
+  ////////////////////////////////////////
+
+  // Forward velocity gain
+  float K_03 = 0.1;
+
+  // Scaling factor
+  float N = 10;
+
+  // Reference velocity
+  float v_0 = 0.5;
+
+  // Fourier coefficient --> forward velocity
+  float b_01 = b[1];
+
+  // Forward velocity control law
+  float wfi_forward_velocity_control = K_03 * (N * v_0 - b_01);
+
+  // Min and max forward velocity limits
+  float v_min = 0.1;
+  float v_max = 2.0;
+
+  // Saturate forward velocity command
+  if(wfi_forward_velocity_control < v_min)
+    wfi_forward_velocity_control = v_min;
+  if(wfi_forward_velocity_control > v_max)
+    wfi_forward_velocity_control = v_min;
+
+  ////////////////////////////////
+  // Calculate yaw rate command //
+  ////////////////////////////////
+
+  // Lateral position gain
+  float K_01 = -0.500;  // K_01 < 0 for stability
+  
+  // Yaw angle gain
+  float K_02 =  0.575;
+
+  // Fourier coefficient --> lateral position
+  float a_01 = a[1];
+
+  // Fourier coefficient --> yaw angle
+  float a_02 = a[2];
+
+  float wfi_yaw_rate_control = K_01 * a_01 + K_02 * a_02;
+
+  // Min and max yaw rate limits
+  float yaw_rate_min = -2.0;
+  float yaw_rate_max =  2.0;
+
+  if(wfi_yaw_rate_control < yaw_rate_min)
+    wfi_yaw_rate_control = yaw_rate_min;
+  if(wfi_yaw_rate_control > yaw_rate_max)
+    wfi_yaw_rate_control = yaw_rate_max;
+
+  //////////////////////////////////
+  // Publish WFI control commands //
+  //////////////////////////////////
+
+  geometry_msgs::Twist wfi_control_command;
+
+  wfi_control_command.linear.x = wfi_forward_velocity_control;
+  wfi_control_command.linear.y = 0;
+  wfi_control_command.linear.z = 0;
+  wfi_control_command.angular.x = 0;
+  wfi_control_command.angular.y = 0;
+  wfi_control_command.angular.z = wfi_yaw_rate_control;
+
+  pub_wfi_control_command_.publish(wfi_control_command);
+
 }
 
 void ScanNodelet::configCb(Config &config, uint32_t level)

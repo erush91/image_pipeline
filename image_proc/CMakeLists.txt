@@ -3,7 +3,16 @@ project(image_proc)
 
 find_package(catkin REQUIRED)
 
-find_package(catkin REQUIRED cv_bridge dynamic_reconfigure image_geometry image_transport nodelet nodelet_topic_tools roscpp sensor_msgs)
+find_package(catkin REQUIRED 
+        cv_bridge
+        dynamic_reconfigure
+        image_geometry
+        image_transport
+        nodelet
+        nodelet_topic_tools
+        roscpp
+        sensor_msgs
+        message_generation)
 find_package(OpenCV REQUIRED)
 find_package(Boost REQUIRED COMPONENTS thread)
 
@@ -11,14 +20,38 @@ if(cv_bridge_VERSION VERSION_GREATER "1.12.0")
   add_compile_options(-std=c++11)
 endif()
 
+add_message_files(
+	DIRECTORY
+	msg
+	FILES
+	FourierCoefsMsg.msg
+)
+
+generate_messages(DEPENDENCIES
+        std_msgs
+        geometry_msgs
+        sensor_msgs
+)
+
 # Dynamic reconfigure support
-generate_dynamic_reconfigure_options(cfg/CropDecimate.cfg cfg/Debayer.cfg cfg/Rectify.cfg cfg/Resize.cfg)
+generate_dynamic_reconfigure_options(
+        cfg/CropDecimate.cfg
+        cfg/Debayer.cfg
+        cfg/Rectify.cfg
+        cfg/Resize.cfg)
 
 catkin_package(
-  CATKIN_DEPENDS image_geometry roscpp sensor_msgs
-  DEPENDS OpenCV
-  INCLUDE_DIRS include
-  LIBRARIES ${PROJECT_NAME}
+        CATKIN_DEPENDS
+        image_geometry
+        roscpp
+        sensor_msgs
+        message_runtime
+        DEPENDS
+        OpenCV
+        INCLUDE_DIRS
+        include
+        LIBRARIES
+        ${PROJECT_NAME}
 )
 
 include_directories(include ${catkin_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
@@ -39,7 +72,7 @@ add_library(${PROJECT_NAME} src/libimage_proc/processor.cpp
 				src/nodelets/scan.cpp
                                 src/nodelets/stopsign.cpp
 )
-add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
+add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${OpenCV_LIBRARIES})
 
 install(TARGETS ${PROJECT_NAME}
