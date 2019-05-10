@@ -197,23 +197,26 @@
       </node>
 
 -->
-<!--
+
       <node pkg="nodelet" type="nodelet" output="screen"
         args="load pointcloud_to_laserscan/pointcloud_to_laserscan_nodelet $(arg manager) $(arg bond)" respawn="$(arg respawn)"
         name="pcl2laser">
 
-        <param name="min_height" type="double" value="0.0" />
-        <param name="max_height" type="double" value="1.0" />
-        <param name="angle_min" type="double" value="-0.785" />
-        <param name="angle_max" type="double" value="0.785" />
-        <param name="angle_increment" type="double" value="0.00218166156" />
-        <param name="use_inf" type="boolean" value="false" />
+        <param name="target_frame" type="str" value="camera_link" />
+        <param name="min_height" type="double" value="0.4" />
+        <param name="max_height" type="double" value="0.6" />
+        <param name="min_range" type="double" value="0" />
+        <param name="max_range" type="double" value="0" />
+        <param name="angle_min" type="double" value="-0.78539816339" />
+        <param name="angle_max" type="double" value="0.78539816339" />
+        <param name="angle_increment" type="double" value="0.01745329251" />
+        <param name="use_inf" type="boolean" value="true" />
 
         <remap from="cloud_in" to="depth_registered/points"/>
 
         <remap from="scan" to="pcl2laser/laserscan"/>
       </node>
--->
+<!--
       <node pkg="nodelet" type="nodelet" output="screen"
         args="load image_proc/scan $(arg manager) $(arg bond)" respawn="$(arg respawn)"
         name="image_proc_scan">
@@ -228,6 +231,7 @@
         <remap from="camera_out/h_scans" to="depth/h_scans"/>
         <remap from="camera_out/h_scan" to="depth/h_scan"/>
       </node>
+-->
 <!--   
       <node pkg="nodelet" type="nodelet" output="screen"
         args="load depthimage_to_laserscan/DepthImageToLaserScanNodelet $(arg manager) $(arg bond)" respawn="$(arg respawn)"
