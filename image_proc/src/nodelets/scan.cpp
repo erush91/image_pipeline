@@ -42,16 +42,16 @@
 #include <sensor_msgs/image_encodings.h>
 #include <dynamic_reconfigure/server.h>
 #include <cv_bridge/cv_bridge.h>
-#include <image_proc/CropDecimateConfig.h>
+#include <image_proc/ScanConfig.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
 
 #include <image_proc/FourierCoefsMsg.h>
 
 #include <std_msgs/Bool.h>
-#include <geometry_msgs/Twist.h>
 #include <std_msgs/Float32MultiArray.h>
-
+#include <std_msgs/Float32.h>
+#include <geometry_msgs/Twist.h>
 
 namespace image_proc {
 
@@ -66,14 +66,15 @@ class ScanNodelet : public nodelet::Nodelet
   std::string target_frame_id_;
   boost::mutex connect_mutex_;
   image_transport::CameraPublisher pub_h_scans_;
-  ros::Publisher pub_h_scan_;
-  ros::Publisher pub_h_nearness_; 
-  ros::Publisher pub_wfi_fourier_;
-  ros::Publisher pub_wfi_control_command_;
-
+  ros::Publisher pub_wfi_h_scan_;
+  ros::Publisher pub_wfi_h_nearness_; 
+  ros::Publisher pub_wfi_h_fourier_coefficients_;
+  ros::Publisher pub_wfi_control_commands_;
+  ros::Publisher pub_wfi_junctionness_;
+  
   // Dynamic reconfigure
   boost::recursive_mutex config_mutex_;
-  typedef image_proc::CropDecimateConfig Config;
+  typedef image_proc::ScanConfig Config;
   typedef dynamic_reconfigure::Server<Config> ReconfigureServer;
   boost::shared_ptr<ReconfigureServer> reconfigure_server_;
   Config config_;
@@ -92,6 +93,7 @@ void ScanNodelet::onInit()
 {
   ros::NodeHandle& nh         = getNodeHandle();
   ros::NodeHandle& private_nh = getPrivateNodeHandle();
+  ros::NodeHandle nh_wfi (nh, "wfi");
   ros::NodeHandle nh_in (nh, "camera");
   ros::NodeHandle nh_out(nh, "camera_out");
   it_in_ .reset(new image_transport::ImageTransport(nh_in));
@@ -119,16 +121,19 @@ void ScanNodelet::onInit()
   pub_h_scans_ = it_out_->advertiseCamera("h_scans",  1, connect_cb, connect_cb, connect_cb_info, connect_cb_info);
   
   // Publisher horizontal line scan
-  pub_h_scan_ = nh.advertise<std_msgs::Float32MultiArray>("h_scan", 10);
+  pub_wfi_h_scan_ = nh_wfi.advertise<std_msgs::Float32MultiArray>("horiz/scan", 10);
 
   // Publisher horizontal nearnes
-  pub_h_nearness_ = nh.advertise<std_msgs::Float32MultiArray>("h_nearness", 10);
+  pub_wfi_h_nearness_ = nh_wfi.advertise<std_msgs::Float32MultiArray>("horiz/nearness", 10);
 
   // Publisher Fourier coefficients
-  pub_wfi_fourier_ = nh.advertise<image_proc::FourierCoefsMsg>("wfi_fourier_coefficients", 10);
+  pub_wfi_h_fourier_coefficients_ = nh_wfi.advertise<image_proc::FourierCoefsMsg>("horiz/fourier_coefficients", 10);
 
   // Publisher WFI control command
-  pub_wfi_control_command_ = nh.advertise<geometry_msgs::Twist>("wfi_control_command", 10);
+  pub_wfi_control_commands_ = nh_wfi.advertise<geometry_msgs::Twist>("control_commands", 10);
+
+  // Publisher WFI junctionness
+  pub_wfi_junctionness_ = nh_wfi.advertise<std_msgs::Float32>("junctionness", 10);
   
 }
 
@@ -151,13 +156,13 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
     boost::lock_guard<boost::recursive_mutex> lock(config_mutex_);
     config = config_;
   }
-  int decimation_x = config.decimation_x;
-  int decimation_y = config.decimation_y;
+  int decimation_x = config.h_decimation_x;
+  int decimation_y = config.h_decimation_y;
+  int max_width = image_msg->width - config.h_x_offset;
+  int max_height = image_msg->height - config.h_y_offset;
+  int width = config.h_width;
+  int height = config.h_height;
 
-  int max_width = image_msg->width - config.x_offset;
-  int max_height = image_msg->height - config.y_offset;
-  int width = config.width;
-  int height = config.height;
   if (width == 0 || width > max_width)
     width = max_width;
   if (height == 0 || height > max_height)
@@ -170,9 +175,9 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
   CvImage h_scans_float(source->header, source->encoding);
   CvImage h_scan(source->header, "32FC1");
 
-  h_scans.image = source->image(cv::Rect(config.x_offset, config.y_offset, width, height));
-  h_scans_float.image = source->image(cv::Rect(config.x_offset, config.y_offset, width, height));
-  h_scan.image = source->image(cv::Rect(config.x_offset, config.y_offset, width, 1));
+  h_scans.image = source->image(cv::Rect(config.h_x_offset, config.h_y_offset, width, height));
+  h_scans_float.image = source->image(cv::Rect(config.h_x_offset, config.h_y_offset, width, height));
+  h_scan.image = source->image(cv::Rect(config.h_x_offset, config.h_y_offset, width, 1));
 
 ////////////////////////////////////
 // CALCULATE HORIZONTAL LINE SCAN //
@@ -195,8 +200,8 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
   int binning_y = std::max((int)info_msg->binning_y, 1);
   out_info->binning_x = binning_x;
   out_info->binning_y = binning_y;
-  out_info->roi.x_offset += config.x_offset * binning_x;
-  out_info->roi.y_offset += config.y_offset * binning_y;
+  out_info->roi.x_offset += config.h_x_offset * binning_x;
+  out_info->roi.y_offset += config.h_y_offset * binning_y;
   out_info->roi.height = height * binning_y;
   out_info->roi.width = width * binning_x;
   
@@ -236,7 +241,7 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
   h_scan_msg.data.clear();
   h_scan_msg.data.insert(h_scan_msg.data.end(), h_scan_array.begin(), h_scan_array.end());
 
-  pub_h_scan_.publish(h_scan_msg);
+  pub_wfi_h_scan_.publish(h_scan_msg);
 
 //////////////////////////////////////////////////////////////////////////
 // CALCULATE WIDE FIELD INTEGRATION //////////////////////////////////////
@@ -293,7 +298,7 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
   nearness_msg.data.clear();
   nearness_msg.data.insert(nearness_msg.data.end(), nearness_array.begin(), nearness_array.end());
 
-  pub_h_nearness_.publish(nearness_msg);
+  pub_wfi_h_nearness_.publish(nearness_msg);
 
   cv::Mat cos_gamma_mat(num_fourier_terms + 1, num_points, CV_32FC1, cos_gamma_arr);
   cv::Mat sin_gamma_mat(num_fourier_terms + 1, num_points, CV_32FC1, sin_gamma_arr);
@@ -392,7 +397,7 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
   wfi_ctrl_cmd_msg.a = a_vector;
   wfi_ctrl_cmd_msg.b = b_vector;
 
-  pub_wfi_fourier_.publish(wfi_ctrl_cmd_msg);
+  pub_wfi_h_fourier_coefficients_.publish(wfi_ctrl_cmd_msg);
 
   ////////////////////////////////////////
   // Calculate forward velocity command //
@@ -462,7 +467,7 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
   wfi_control_command.angular.y = 0;
   wfi_control_command.angular.z = wfi_yaw_rate_control;
 
-  pub_wfi_control_command_.publish(wfi_control_command);
+  pub_wfi_control_commands_.publish(wfi_control_command);
 
 }
 

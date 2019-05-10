@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 
 import numpy as np
 from numpy import pi
@@ -92,10 +93,10 @@ def cart_scan( arr ):
 
 rospy.init_node( 'scan_plot' , anonymous = True )
 	
-rospy.Subscriber( "depth/h_scan" , Float32MultiArray , scan_cb )
-rospy.Subscriber( "depth/h_nearness" , Float32MultiArray , nearness_cb )
-rospy.Subscriber( "depth/wfi_fourier_coefficients" , FourierCoefsMsg , wfi_fourier_coeffs_cb )
-rospy.Subscriber( "depth/wfi_control_command" , Twist , wfi_control_command_cb )
+rospy.Subscriber( "camera/wfi/horiz/scan" , Float32MultiArray , scan_cb )
+rospy.Subscriber( "camera/wfi/horiz/nearness" , Float32MultiArray , nearness_cb )
+rospy.Subscriber( "camera/wfi/horiz/fourier_coefficients" , FourierCoefsMsg , wfi_fourier_coeffs_cb )
+rospy.Subscriber( "camera/wfi/control_commands" , Twist , wfi_control_command_cb )
 
 try:
 	while ( not rospy.is_shutdown() ):

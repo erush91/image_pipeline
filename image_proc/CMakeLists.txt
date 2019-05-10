@@ -38,7 +38,8 @@ generate_dynamic_reconfigure_options(
         cfg/CropDecimate.cfg
         cfg/Debayer.cfg
         cfg/Rectify.cfg
-        cfg/Resize.cfg)
+        cfg/Resize.cfg
+        cfg/Scan.cfg)
 
 catkin_package(
         CATKIN_DEPENDS
