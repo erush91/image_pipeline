@@ -407,15 +407,16 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
   // Reference velocity
   float v_0 = 0.5;
 
-  // Fourier coefficient --> forward velocity
-  float b_01 = b[1];
-
-  // Forward velocity control law
-  float wfi_forward_velocity_control = K_03 * (N * v_0 - b_01);
+  // Fourier coefficient
+  float a_1 = a[0];
+  float a_2 = a[1];
 
   // Min and max forward velocity limits
   float v_min = 0.1;
   float v_max = 2.0;
+
+  // Forward velocity control law
+  float wfi_forward_velocity_control = 1 - v_max * (a_0 - a_2);
 
   // Saturate forward velocity command
   if(wfi_forward_velocity_control < v_min)
@@ -428,18 +429,16 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
   ////////////////////////////////
 
   // Lateral position gain
-  float K_01 = -0.500;  // K_01 < 0 for stability
+  float K_1 = 0; // -0.500;  // K_01 < 0 for stability
   
   // Yaw angle gain
-  float K_02 =  0.575;
+  float K_2 =  0.5; // 0.575;
 
-  // Fourier coefficient --> lateral position
-  float a_01 = a[1];
+  // Fourier coefficient
+  float b_1 = b[1];
+  float b_2 = b[2];
 
-  // Fourier coefficient --> yaw angle
-  float a_02 = a[2];
-
-  float wfi_yaw_rate_control = K_01 * a_01 + K_02 * a_02;
+  float wfi_yaw_rate_control = K_1 * b_1 + K_2 * b_2;
 
   // Min and max yaw rate limits
   float yaw_rate_min = -2.0;

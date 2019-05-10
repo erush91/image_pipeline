@@ -224,15 +224,15 @@ try:
 
                 dc = pd.DataFrame({'A' : [1, 2, 3, 4],'B' : [4, 3, 2, 1],'C' : [3, 4, 2, 2]})
 
-                plt.plot(dc)
-                plt.legend(dc.columns)
-                dcsummary = pd.DataFrame([dc.mean(), dc.sum()],index=['Mean','Total'])
+                # plt.plot(dc)
+                # plt.legend(dc.columns)
+                # dcsummary = pd.DataFrame([dc.mean(), dc.sum()],index=['Mean','Total'])
 
-                plt.table(cellText=dcsummary.values,colWidths = [0.25]*len(dc.columns),
-                rowLabels=dcsummary.index,
-                colLabels=dcsummary.columns,
-                cellLoc = 'center', rowLoc = 'center',
-                loc='bottom', bbox=[0.25, -0.5, 0.5, 0.3])
+                # plt.table(cellText=dcsummary.values,colWidths = [0.25]*len(dc.columns),
+                # rowLabels=dcsummary.index,
+                # colLabels=dcsummary.columns,
+                # cellLoc = 'center', rowLoc = 'center',
+                # loc='bottom', bbox=[0.25, -0.5, 0.5, 0.3])
 
 		plt.pause( 0.001 )
 	plt.show()
