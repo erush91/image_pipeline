@@ -469,6 +469,17 @@ void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
 
   pub_wfi_control_commands_.publish(wfi_control_command);
 
+  //////////////////////////////
+  // Calculation Junctionness //
+  //////////////////////////////
+
+  std_msgs::Float32 wfi_junctionness;
+
+  // ***** THIS IS NOT ROBUST ***
+  wfi_junctionness.data = 1.8 * a_2 - a_0;
+
+  pub_wfi_junctionness_.publish(wfi_junctionness);
+
 }
 
 void ScanNodelet::configCb(Config &config, uint32_t level)
