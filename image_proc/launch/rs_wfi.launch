@@ -198,7 +198,7 @@
 
 -->
 
-      <node pkg="nodelet" type="nodelet" output="screen"
+      <!-- <node pkg="nodelet" type="nodelet" output="screen"
         args="load pointcloud_to_laserscan/pointcloud_to_laserscan_nodelet $(arg manager) $(arg bond)" respawn="$(arg respawn)"
         name="pcl2laser">
 
@@ -215,23 +215,29 @@
         <remap from="cloud_in" to="depth_registered/points"/>
 
         <remap from="scan" to="pcl2laser/laserscan"/>
-      </node>
-<!--
+      </node> -->
+
       <node pkg="nodelet" type="nodelet" output="screen"
         args="load image_proc/scan $(arg manager) $(arg bond)" respawn="$(arg respawn)"
         name="image_proc_scan">
         <param name="h_x_offset" type="int" value="30" />
-        <param name="h_y_offset" type="int" value="239" />
+        <param name="h_y_offset" type="int" value="289" />
         <param name="h_width" type="int" value="580" />
         <param name="h_height" type="int" value="3" />
+
+        <param name="v_x_offset" type="int" value="209" />
+        <param name="v_y_offset" type="int" value="30" />
+        <param name="v_width" type="int" value="3" />
+        <param name="v_height" type="int" value="420" />
 
         <remap from="camera/image_raw" to="depth/image_rect_raw"/>
         <remap from="camera/image_info" to="depth/camera_info"/>
   
         <remap from="camera_out/h_scans" to="depth/h_scans"/>
+        <remap from="camera_out/v_scans" to="depth/v_scans"/>
         <remap from="camera_out/h_scan" to="depth/h_scan"/>
       </node>
--->
+
 <!--   
       <node pkg="nodelet" type="nodelet" output="screen"
         args="load depthimage_to_laserscan/DepthImageToLaserScanNodelet $(arg manager) $(arg bond)" respawn="$(arg respawn)"
