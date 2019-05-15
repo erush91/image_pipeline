@@ -176,6 +176,196 @@ namespace image_proc
         return shorter_check;
     }
 
+    void ScanNodelet::get_h_strip(const sensor_msgs::ImageConstPtr& image_msg,
+                                  const sensor_msgs::CameraInfoConstPtr& info_msg)
+    {
+        
+        ///////////////////////////////
+        // Get Horizontal Laser Scan //
+        ///////////////////////////////
+
+        int max_h_width = image_msg->width - h_x_offset_;
+        int max_h_height = image_msg->height - h_y_offset_;
+        h_width_cropped = h_width_;
+        h_height_cropped = h_height_;
+
+        if (h_width_cropped == 0 || h_width_cropped > max_h_width)
+        h_width_cropped = max_h_width;
+        if (h_height_cropped == 0 || h_height_cropped > max_h_height)
+        h_height_cropped = max_h_height;
+
+        int max_v_width = image_msg->width - v_x_offset_;
+        int max_v_height = image_msg->height - v_y_offset_;
+        v_width_cropped = v_width_;
+        v_height_cropped = v_height_;
+
+        if (v_width_ == 0 || v_width_ > max_v_width)
+        v_width_cropped = max_v_width;
+        if (v_height_ == 0 || v_height_ > max_v_height)
+        v_height_cropped = max_v_height;
+
+        // Get h_a cv::Mat view of the source data
+        source = toCvShare(image_msg);
+
+        //////////////////////////////////
+        // Get Selected Horizontal Rows //
+        //////////////////////////////////
+
+        CvImage h_scans(source->header, source->encoding);
+        CvImage h_scans_float(source->header, source->encoding);
+        CvImage h_scan(source->header, "32FC1");
+
+        h_scans.image = source->image(cv::Rect(h_x_offset_, h_y_offset_, h_width_cropped, h_height_cropped));
+        h_scans_float.image = source->image(cv::Rect(h_x_offset_, h_y_offset_, h_width_cropped, h_height_cropped));
+        h_scan.image = source->image(cv::Rect(h_x_offset_, h_y_offset_, h_width_cropped, 1));
+
+        ////////////////////////////////////
+        // Calculate Horizontal Line Scan //
+        ////////////////////////////////////
+
+        // Convert to from 2 bytes (16 bit) to float, and scale from mm to m
+        h_scans.image.convertTo(h_scans_float.image, CV_32FC1,0.001); // [mm] --> [m]
+        
+        reduce(h_scans_float.image, h_scan.image, 0, CV_REDUCE_AVG, CV_32FC1); // 0 = AVERAGE COLUMNS
+
+        ///////////////////////////////////
+        // Publish Horizontal Line Scans //
+        ///////////////////////////////////
+
+        // Create h_scans Image message
+        sensor_msgs::ImagePtr out_h_scans = h_scans.toImageMsg();
+
+        // Create updated CameraInfo message
+        sensor_msgs::CameraInfoPtr out_h_info = boost::make_shared<sensor_msgs::CameraInfo>(*info_msg);
+        int h_binning_x = std::max((int)info_msg->binning_x, 1);
+        int h_binning_y = std::max((int)info_msg->binning_y, 1);
+        out_h_info->binning_x = h_binning_x;
+        out_h_info->binning_y = h_binning_y;
+        out_h_info->roi.x_offset += h_x_offset_ * h_binning_x;
+        out_h_info->roi.y_offset += h_y_offset_ * h_binning_y;
+        out_h_info->roi.width = h_width_cropped * h_binning_x;
+        out_h_info->roi.height = h_height_cropped * h_binning_y;
+        
+        // If no ROI specified, leave do_rectify as-is. If ROI specified, set do_rectify = true.
+        if (h_width_cropped != (int)image_msg->width || h_height_cropped != (int)image_msg->height)
+        {
+        out_h_info->roi.do_rectify = true;
+        }
+
+        if (!target_frame_id_.empty())
+        {
+        out_h_scans->header.frame_id = target_frame_id_;
+        out_h_info->header.frame_id = target_frame_id_;
+        }
+
+        pub_h_scans_.publish(out_h_scans, out_h_info);
+
+        ////////////////////////////////////
+        // Saturate horizontal depth scan //
+        ////////////////////////////////////
+
+        h_depth_sat = h_scan.image;
+
+        h_depth_sat.setTo(0.5, h_depth_sat < 0.5);
+        h_depth_sat.setTo(10, h_depth_sat > 10);
+
+        ////////////////////////////////////
+        // Publish horizontal depth scan  //
+        ////////////////////////////////////
+
+        std::vector<float> h_scan_array(h_depth_sat.begin<float>(), h_depth_sat.end<float>());
+
+        std_msgs::Float32MultiArray h_scan_msg;
+        h_scan_msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
+        h_scan_msg.layout.dim[0].size = h_scan_array.size();
+        h_scan_msg.data.clear();
+        h_scan_msg.data.insert(h_scan_msg.data.end(), h_scan_array.begin(), h_scan_array.end());
+
+        pub_wfi_h_scan_.publish(h_scan_msg);
+    }
+
+    void ScanNodelet::get_v_strip(const sensor_msgs::ImageConstPtr& image_msg,
+                                  const sensor_msgs::CameraInfoConstPtr& info_msg)
+    {
+        
+        ///////////////////////////////
+        // Get Seleted Vertical Rows //
+        ///////////////////////////////
+
+        CvImage v_scans(source->header, source->encoding);
+        CvImage v_scans_float(source->header, source->encoding);
+        CvImage v_scan(source->header, "32FC1");
+
+        v_scans.image = source->image(cv::Rect(v_x_offset_, v_y_offset_, v_width_cropped, v_height_cropped));
+        v_scans_float.image = source->image(cv::Rect(v_x_offset_, v_y_offset_, v_width_cropped, v_height_cropped));
+        v_scan.image = source->image(cv::Rect(v_x_offset_, v_y_offset_, 1, v_height_cropped));
+
+        //////////////////////////////////
+        // Calculate Vertical Line Scan //
+        //////////////////////////////////
+
+        // Convert to from 2 bytes (16 bit) to float, and scale from mm to m
+        v_scans.image.convertTo(v_scans_float.image, CV_32FC1,0.001); // [mm] --> [m]
+        
+        reduce(v_scans_float.image, v_scan.image, 1, CV_REDUCE_AVG, CV_32FC1); // 1 = AVERAGE ROWS
+
+        /////////////////////////////////
+        // Publish Vertical Line Scans //
+        /////////////////////////////////
+
+        // Create h_scans Image message
+        sensor_msgs::ImagePtr out_v_scans = v_scans.toImageMsg();
+
+        // Create updated CameraInfo message
+        sensor_msgs::CameraInfoPtr out_v_info = boost::make_shared<sensor_msgs::CameraInfo>(*info_msg);
+        int v_binning_x = std::max((int)info_msg->binning_x, 1);
+        int v_binning_y = std::max((int)info_msg->binning_y, 1);
+        out_v_info->binning_x = v_binning_x;
+        out_v_info->binning_y = v_binning_y;
+        out_v_info->roi.x_offset += v_x_offset_ * v_binning_x;
+        out_v_info->roi.y_offset += v_y_offset_ * v_binning_y;
+        out_v_info->roi.width = v_width_cropped * v_binning_x;
+        out_v_info->roi.height = v_height_cropped * v_binning_y;
+        
+        // If no ROI specified, leave do_rectify as-is. If ROI specified, set do_rectify = true.
+        if (v_width_cropped != (int)image_msg->width || v_height_cropped != (int)image_msg->height)
+        {
+        out_v_info->roi.do_rectify = true;
+        }
+
+        if (!target_frame_id_.empty())
+        {
+        out_v_scans->header.frame_id = target_frame_id_;
+        out_v_info->header.frame_id = target_frame_id_;
+        }
+
+        pub_v_scans_.publish(out_v_scans, out_v_info);
+
+        //////////////////////////////////
+        // Saturate vertical depth scan //
+        //////////////////////////////////
+
+        v_depth_sat = cv::Mat::zeros(cv::Size(1, v_height_cropped), CV_32FC1);
+        cv::transpose(v_scan.image, v_depth_sat);
+        
+        v_depth_sat.setTo(0.5, v_depth_sat < 0.5);
+        v_depth_sat.setTo(10, v_depth_sat > 10);
+
+        /////////////////////////////////
+        // Publish vertical depth scan //
+        /////////////////////////////////
+
+        std::vector<float> v_scan_array(v_depth_sat.begin<float>(), v_depth_sat.end<float>());
+
+        std_msgs::Float32MultiArray v_scan_msg;
+        v_scan_msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
+        v_scan_msg.layout.dim[0].size = v_scan_array.size();
+        v_scan_msg.data.clear();
+        v_scan_msg.data.insert(v_scan_msg.data.end(), v_scan_array.begin(), v_scan_array.end());
+
+        pub_wfi_v_scan_.publish(v_scan_msg);
+    }
+
     sensor_msgs::LaserScanPtr ScanNodelet::convert_msg(const sensor_msgs::ImageConstPtr& depth_msg,
                                                        const sensor_msgs::CameraInfoConstPtr& info_msg)
     {
@@ -288,188 +478,9 @@ namespace image_proc
         // sensor_msgs::LaserScanPtr scan_msg = ScanNodelet::convert_msg(const sensor_msgs::ImageConstPtr& image_msg,
         //     const sensor_msgs::CameraInfoConstPtr& info_msg)
 
-        ///////////////////////////////
-        // Get Horizontal Laser Scan //
-        ///////////////////////////////
-
+        get_h_strip(image_msg, info_msg);
         
-
-        int max_h_width = image_msg->width - h_x_offset_;
-        int max_h_height = image_msg->height - h_y_offset_;
-        int h_width = config.h_width;
-        int h_height = config.h_height;
-
-        if (h_width == 0 || h_width > max_h_width)
-        h_width = max_h_width;
-        if (h_height == 0 || h_height > max_h_height)
-        h_height = max_h_height;
-
-        int max_v_width = image_msg->width - v_x_offset_;
-        int max_v_height = image_msg->height - v_y_offset_;
-        int v_width = config.v_width;
-        int v_height = config.v_height;
-
-        if (v_width_ == 0 || v_width_ > max_v_width)
-        v_width = max_v_width;
-        if (v_height_ == 0 || v_height_ > max_v_height)
-        v_height = max_v_height;
-
-        // Get h_a cv::Mat view of the source data
-        CvImageConstPtr source = toCvShare(image_msg);
-
-        //////////////////////////////////
-        // Get Selected Horizontal Rows //
-        //////////////////////////////////
-
-        CvImage h_scans(source->header, source->encoding);
-        CvImage h_scans_float(source->header, source->encoding);
-        CvImage h_scan(source->header, "32FC1");
-
-        h_scans.image = source->image(cv::Rect(h_x_offset_, h_y_offset_, h_width, h_height));
-        h_scans_float.image = source->image(cv::Rect(h_x_offset_, h_y_offset_, h_width, h_height));
-        h_scan.image = source->image(cv::Rect(h_x_offset_, h_y_offset_, h_width, 1));
-
-        ///////////////////////////////
-        // Get Seleted Vertical Rows //
-        ///////////////////////////////
-
-        CvImage v_scans(source->header, source->encoding);
-        CvImage v_scans_float(source->header, source->encoding);
-        CvImage v_scan(source->header, "32FC1");
-
-        v_scans.image = source->image(cv::Rect(v_x_offset_, v_y_offset_, v_width, v_height));
-        v_scans_float.image = source->image(cv::Rect(v_x_offset_, v_y_offset_, v_width, v_height));
-        v_scan.image = source->image(cv::Rect(v_x_offset_, v_y_offset_, 1, v_height));
-
-        ////////////////////////////////////
-        // Calculate Horizontal Line Scan //
-        ////////////////////////////////////
-
-        // Convert to from 2 bytes (16 bit) to float, and scale from mm to m
-        h_scans.image.convertTo(h_scans_float.image, CV_32FC1,0.001); // [mm] --> [m]
-        
-        reduce(h_scans_float.image, h_scan.image, 0, CV_REDUCE_AVG, CV_32FC1); // 0 = AVERAGE COLUMNS
-
-        //////////////////////////////////
-        // Calculate Vertical Line Scan //
-        //////////////////////////////////
-
-        // Convert to from 2 bytes (16 bit) to float, and scale from mm to m
-        v_scans.image.convertTo(v_scans_float.image, CV_32FC1,0.001); // [mm] --> [m]
-        
-        reduce(v_scans_float.image, v_scan.image, 1, CV_REDUCE_AVG, CV_32FC1); // 1 = AVERAGE ROWS
-        
-        ///////////////////////////////////
-        // Publish Horizontal Line Scans //
-        ///////////////////////////////////
-
-        // Create h_scans Image message
-        sensor_msgs::ImagePtr out_h_scans = h_scans.toImageMsg();
-
-        // Create updated CameraInfo message
-        sensor_msgs::CameraInfoPtr out_h_info = boost::make_shared<sensor_msgs::CameraInfo>(*info_msg);
-        int h_binning_x = std::max((int)info_msg->binning_x, 1);
-        int h_binning_y = std::max((int)info_msg->binning_y, 1);
-        out_h_info->binning_x = h_binning_x;
-        out_h_info->binning_y = h_binning_y;
-        out_h_info->roi.x_offset += h_x_offset_ * h_binning_x;
-        out_h_info->roi.y_offset += h_y_offset_ * h_binning_y;
-        out_h_info->roi.width = h_width * h_binning_x;
-        out_h_info->roi.height = h_height * h_binning_y;
-        
-        // If no ROI specified, leave do_rectify as-is. If ROI specified, set do_rectify = true.
-        if (h_width != (int)image_msg->width || h_height != (int)image_msg->height)
-        {
-        out_h_info->roi.do_rectify = true;
-        }
-
-        if (!target_frame_id_.empty())
-        {
-        out_h_scans->header.frame_id = target_frame_id_;
-        out_h_info->header.frame_id = target_frame_id_;
-        }
-
-        pub_h_scans_.publish(out_h_scans, out_h_info);
-
-        /////////////////////////////////
-        // Publish Vertical Line Scans //
-        /////////////////////////////////
-
-        // Create h_scans Image message
-        sensor_msgs::ImagePtr out_v_scans = v_scans.toImageMsg();
-
-        // Create updated CameraInfo message
-        sensor_msgs::CameraInfoPtr out_v_info = boost::make_shared<sensor_msgs::CameraInfo>(*info_msg);
-        int v_binning_x = std::max((int)info_msg->binning_x, 1);
-        int v_binning_y = std::max((int)info_msg->binning_y, 1);
-        out_v_info->binning_x = v_binning_x;
-        out_v_info->binning_y = v_binning_y;
-        out_v_info->roi.x_offset += v_x_offset_ * v_binning_x;
-        out_v_info->roi.y_offset += v_y_offset_ * v_binning_y;
-        out_v_info->roi.width = v_width * v_binning_x;
-        out_v_info->roi.height = v_height * v_binning_y;
-        
-        // If no ROI specified, leave do_rectify as-is. If ROI specified, set do_rectify = true.
-        if (v_width != (int)image_msg->width || v_height != (int)image_msg->height)
-        {
-        out_v_info->roi.do_rectify = true;
-        }
-
-        if (!target_frame_id_.empty())
-        {
-        out_v_scans->header.frame_id = target_frame_id_;
-        out_v_info->header.frame_id = target_frame_id_;
-        }
-
-        pub_v_scans_.publish(out_v_scans, out_v_info);
-
-        ////////////////////////////////////
-        // Saturate horizontal depth scan //
-        ////////////////////////////////////
-
-        cv::Mat h_depth_sat = cv::Mat::zeros(cv::Size(1, h_width), CV_32FC1);
-        h_depth_sat = h_scan.image;
-
-        h_depth_sat.setTo(0.5, h_depth_sat < 0.5);
-        h_depth_sat.setTo(10, h_depth_sat > 10);
-
-        //////////////////////////////////
-        // Saturate vertical depth scan //
-        //////////////////////////////////
-
-        cv::Mat v_depth_sat = cv::Mat::zeros(cv::Size(1, v_height), CV_32FC1);
-        cv::transpose(v_scan.image, v_depth_sat);
-        
-        v_depth_sat.setTo(0.5, v_depth_sat < 0.5);
-        v_depth_sat.setTo(10, v_depth_sat > 10);
-        
-        ////////////////////////////////////
-        // Publish horizontal depth scan  //
-        ////////////////////////////////////
-
-        std::vector<float> h_scan_array(h_depth_sat.begin<float>(), h_depth_sat.end<float>());
-
-        std_msgs::Float32MultiArray h_scan_msg;
-        h_scan_msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
-        h_scan_msg.layout.dim[0].size = h_scan_array.size();
-        h_scan_msg.data.clear();
-        h_scan_msg.data.insert(h_scan_msg.data.end(), h_scan_array.begin(), h_scan_array.end());
-
-        pub_wfi_h_scan_.publish(h_scan_msg);
-
-        /////////////////////////////////
-        // Publish vertical depth scan //
-        /////////////////////////////////
-
-        std::vector<float> v_scan_array(v_depth_sat.begin<float>(), v_depth_sat.end<float>());
-
-        std_msgs::Float32MultiArray v_scan_msg;
-        v_scan_msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
-        v_scan_msg.layout.dim[0].size = v_scan_array.size();
-        v_scan_msg.data.clear();
-        v_scan_msg.data.insert(v_scan_msg.data.end(), v_scan_array.begin(), v_scan_array.end());
-
-        pub_wfi_v_scan_.publish(v_scan_msg);
+        get_v_strip(image_msg, info_msg);
 
         //////////////////////////////////////////////////////////////////////////
         // CALCULATE WIDE FIELD INTEGRATION //////////////////////////////////////
@@ -480,7 +491,7 @@ namespace image_proc
         //////////////////////////////////
 
         int h_num_points;
-        h_num_points = h_width;
+        h_num_points = h_width_cropped;
         int h_num_fourier_terms;
         h_num_fourier_terms = 4;
         float h_fourier_terms;
@@ -503,7 +514,7 @@ namespace image_proc
         ////////////////////////////////
 
         int v_num_points;
-        v_num_points = v_height;
+        v_num_points = v_height_cropped;
         int v_num_fourier_terms;
         v_num_fourier_terms = 4;
         float v_fourier_terms;

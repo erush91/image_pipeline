@@ -106,6 +106,12 @@ class ScanNodelet : public nodelet::Nodelet
   void imageCb(const sensor_msgs::ImageConstPtr& image_msg,
                const sensor_msgs::CameraInfoConstPtr& info_msg);
 
+  void get_h_strip(const sensor_msgs::ImageConstPtr& image_msg,
+                   const sensor_msgs::CameraInfoConstPtr& info_msg);
+
+  void get_v_strip(const sensor_msgs::ImageConstPtr& image_msg,
+                   const sensor_msgs::CameraInfoConstPtr& info_msg);
+
   sensor_msgs::LaserScanPtr convert_msg(const sensor_msgs::ImageConstPtr& depth_msg,
                                         const sensor_msgs::CameraInfoConstPtr& info_msg);
   
@@ -275,6 +281,13 @@ private:
   int scan_height_; ///< Number of pixel rows to use when producing a laserscan from an area.
   std::string output_frame_id_; ///< Output frame_id for each laserscan.  This is likely NOT the camera's frame_id.
 
+  CvImageConstPtr source;
+  int v_width_cropped; 
+  int v_height_cropped;
+  int h_width_cropped; 
+  int h_height_cropped;
+  cv::Mat h_depth_sat;
+  cv::Mat v_depth_sat;
 };
   
 }; // depthimage_to_laserscan
