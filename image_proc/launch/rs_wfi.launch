@@ -237,18 +237,18 @@
         <remap from="camera_out/v_scans" to="depth/v_scans"/>
         <remap from="camera_out/h_scan" to="depth/h_scan"/>
       </node>
-
+<!-- 
   
       <node pkg="nodelet" type="nodelet" output="screen"
         args="load depthimage_to_laserscan/DepthImageToLaserScanNodelet $(arg manager) $(arg bond)" respawn="$(arg respawn)"
         name="depth2laser">
           <param name="scan_height" type="int" value="240"/>
           <param name="range_max" type="double" value="100.0"/>
-          <param name="range_min" type="double" value="-100.0"/>
+          <param name="range_min" type="double" value="0.0"/>
           <param name="output_frame_id" type="str" value="base_link"/>
           <remap from="image" to="depth/image_rect_raw" />
           <remap from="scan" to="depth/laserscan" />
-      </node>
+      </node> -->
 
   </group>
 </launch>
