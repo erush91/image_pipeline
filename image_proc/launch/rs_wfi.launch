@@ -198,7 +198,8 @@
 
 -->
 
-      <!-- <node pkg="nodelet" type="nodelet" output="screen"
+      <!-- PCL to Laserscan Nodelet -->
+      <node pkg="nodelet" type="nodelet" output="screen"
         args="load pointcloud_to_laserscan/pointcloud_to_laserscan_nodelet $(arg manager) $(arg bond)" respawn="$(arg respawn)"
         name="pcl2laser">
 
@@ -215,8 +216,9 @@
         <remap from="cloud_in" to="depth_registered/points"/>
 
         <remap from="scan" to="pcl2laser/laserscan"/>
-      </node> -->
+      </node>
 
+      <!-- Gene's WFI Nodelet -->
       <node pkg="nodelet" type="nodelet" output="screen"
         args="load image_proc/scan $(arg manager) $(arg bond)" respawn="$(arg respawn)"
         name="image_proc_scan">
@@ -244,11 +246,10 @@
         <param name="output_frame_id" type="str" value="base_link"/>
         <remap from="image" to="depth/image_rect_raw" />
         <remap from="scan" to="depth/laserscan" />
-  
-      </node>
-<!-- 
-  
-      <node pkg="nodelet" type="nodelet" output="screen"
+      </node>  
+
+      <!-- Depth Image to Laserscan Nodelet -->
+      <!-- <node pkg="nodelet" type="nodelet" output="screen"
         args="load depthimage_to_laserscan/DepthImageToLaserScanNodelet $(arg manager) $(arg bond)" respawn="$(arg respawn)"
         name="depth2laser">
           <param name="scan_height" type="int" value="240"/>
