@@ -65,7 +65,6 @@ namespace image_proc
 class ScanNodelet : public nodelet::Nodelet
 {
 
-
   // ROS communication
   boost::shared_ptr<image_transport::ImageTransport> it_in_, it_out_;
   image_transport::CameraSubscriber sub_;
@@ -154,6 +153,11 @@ class ScanNodelet : public nodelet::Nodelet
 
   // Handles (un)subscribing when clients (un)subscribe;
   void connectCb(){}
+
+  void configCb(Config &config, uint32_t level)
+  {
+    config_ = config;
+  }
 
   void imageCb(const sensor_msgs::ImageConstPtr& image_msg,
                           const sensor_msgs::CameraInfoConstPtr& info_msg)
@@ -686,11 +690,6 @@ class ScanNodelet : public nodelet::Nodelet
 
     pub_wfi_junctionness_.publish(wfi_junctionness);
 
-  }
-
-  void configCb(Config &config, uint32_t level)
-  {
-    config_ = config;
   }
 
   sensor_msgs::LaserScanPtr convert_msg(const sensor_msgs::ImageConstPtr& depth_msg,
