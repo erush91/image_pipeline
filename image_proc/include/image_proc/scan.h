@@ -112,8 +112,16 @@ class ScanNodelet : public nodelet::Nodelet
   void get_v_strip(const sensor_msgs::ImageConstPtr& image_msg,
                    const sensor_msgs::CameraInfoConstPtr& info_msg);
 
-  sensor_msgs::LaserScanPtr convert_msg(const sensor_msgs::ImageConstPtr& depth_msg,
-                                        const sensor_msgs::CameraInfoConstPtr& info_msg);
+  void calc_h_wfi_fourier_coefficients();
+
+  void calc_v_wfi_fourier_coefficients();
+
+  void calc_forward_velocity_command();
+
+  void calc_yaw_rate_command();
+
+  sensor_msgs::LaserScanPtr depthimage_to_horiz_laserscan(const sensor_msgs::ImageConstPtr& depth_msg,
+                                                          const sensor_msgs::CameraInfoConstPtr& info_msg);
   
   /**
    * Sets the scan time parameter.
@@ -288,6 +296,13 @@ private:
   int h_height_cropped;
   cv::Mat h_depth_sat;
   cv::Mat v_depth_sat;
+  float h_a_0, h_a[4], h_b[4]; // *** TO DO: Remove hard-coded length ***
+  float h_a_2;
+  float wfi_forward_velocity_control;
+  float wfi_yaw_rate_control;
+  
+
+
 };
   
 }; // depthimage_to_laserscan
