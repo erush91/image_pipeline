@@ -220,7 +220,7 @@ namespace image_proc
         }
 
         // Calculate and fill the ranges
-        uint32_t ranges_size = depth_msg->width;
+        uint32_t ranges_size = 500;//depth_msg->width;
         scan_msg->ranges.assign(ranges_size, std::numeric_limits<float>::quiet_NaN());
         
         if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1)
@@ -244,28 +244,15 @@ namespace image_proc
     void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
                             const sensor_msgs::CameraInfoConstPtr& info_msg)
     {
-        
+
         //////////////////////////////////////////////////////////////////////////
-        // PROCESS DEPTH IMAGE ///////////////////////////////////////////////////
+        // GET DYNAMIC PARAMETERS ////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
-
-        /// @todo Check image dimensions match info_msg
-        /// @todo Publish tweaks to config_ so they appear in reconfigure_gui
-
-        // sensor_msgs::LaserScanPtr scan_msg = ScanNodelet::convert_msg(const sensor_msgs::ImageConstPtr& image_msg,
-        //     const sensor_msgs::CameraInfoConstPtr& info_msg)
-
-        sensor_msgs::LaserScanPtr h_laserscan_msg = convert_msg(image_msg, info_msg);
-        pub_h_laserscan_.publish(h_laserscan_msg);
-
-        ////////////////////////////
-        // Get Dynamic Parameters //
-        ////////////////////////////
 
         Config config;
         {
-        boost::lock_guard<boost::recursive_mutex> lock(config_mutex_);
-        config = config_;
+            boost::lock_guard<boost::recursive_mutex> lock(config_mutex_);
+            config = config_;
         }
 
         h_x_offset_ = config.h_x_offset;
@@ -284,9 +271,28 @@ namespace image_proc
         scan_height_ = config.scan_height;
         output_frame_id_ = config.output_frame_id;
 
+        ///////////////////////////////////////////////////////////////////////////
+        // PUBLISH HORIZONTAL LASERSCAN (from depthimage_to_laserscan, accurate) //
+        ///////////////////////////////////////////////////////////////////////////
+
+        sensor_msgs::LaserScanPtr h_laserscan_msg = convert_msg(image_msg, info_msg);
+        pub_h_laserscan_.publish(h_laserscan_msg);
+
+        ///////////////////////////////////////////////////////////////////////////
+        // PROCESS DEPTH IMAGE (Direct from depth image, distorted) ///////////////
+        ///////////////////////////////////////////////////////////////////////////
+
+        /// @todo Check image dimensions match info_msg
+        /// @todo Publish tweaks to config_ so they appear in reconfigure_gui
+
+        // sensor_msgs::LaserScanPtr scan_msg = ScanNodelet::convert_msg(const sensor_msgs::ImageConstPtr& image_msg,
+        //     const sensor_msgs::CameraInfoConstPtr& info_msg)
+
         ///////////////////////////////
         // Get Horizontal Laser Scan //
         ///////////////////////////////
+
+        
 
         int max_h_width = image_msg->width - h_x_offset_;
         int max_h_height = image_msg->height - h_y_offset_;

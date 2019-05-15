@@ -220,22 +220,31 @@
       <node pkg="nodelet" type="nodelet" output="screen"
         args="load image_proc/scan $(arg manager) $(arg bond)" respawn="$(arg respawn)"
         name="image_proc_scan">
-        <param name="h_x_offset" type="int" value="30" />
-        <param name="h_y_offset" type="int" value="289" />
-        <param name="h_width" type="int" value="580" />
-        <param name="h_height" type="int" value="3" />
+        
+        <!-- Parameters for Horizontal Laserscan -->
+        <param name="h_x_offset" type="int" value="30" />   <!-- cropped 0-640 to 30-610 -->
+        <param name="h_y_offset" type="int" value="289" />  <!-- cropped 0-480 to 289-291 --> 
+        <param name="h_width" type="int" value="580" />     <!-- cropped 0-640 to 30-610 -->
+        <param name="h_height" type="int" value="3" />      <!-- cropped 0-480 to 289-291 --> 
 
-        <param name="v_x_offset" type="int" value="209" />
-        <param name="v_y_offset" type="int" value="30" />
-        <param name="v_width" type="int" value="3" />
-        <param name="v_height" type="int" value="420" />
+        <!-- Parameters for Vertical Laserscan -->
+        <param name="v_x_offset" type="int" value="319" />  <!-- cropped 0-640 to 319-321 -->
+        <param name="v_y_offset" type="int" value="30" />   <!-- cropped 0-480 to 30-450 -->
+        <param name="v_width" type="int" value="3" />       <!-- cropped 0-640 to 319-321 -->
+        <param name="v_height" type="int" value="420" />    <!-- cropped 0-480 to 30-450 -->
 
+        <!-- Remap Subscribed Topics -->
         <remap from="camera/image_raw" to="depth/image_rect_raw"/>
         <remap from="camera/image_info" to="depth/camera_info"/>
+
+        <!-- Parameters for Laserscan -->
+        <param name="scan_height" type="int" value="1"/>
+        <param name="range_max" type="double" value="100.0"/>
+        <param name="range_min" type="double" value="0.0"/>
+        <param name="output_frame_id" type="str" value="base_link"/>
+        <remap from="image" to="depth/image_rect_raw" />
+        <remap from="scan" to="depth/laserscan" />
   
-        <remap from="camera_out/h_scans" to="depth/h_scans"/>
-        <remap from="camera_out/v_scans" to="depth/v_scans"/>
-        <remap from="camera_out/h_scan" to="depth/h_scan"/>
       </node>
 <!-- 
   

@@ -104,10 +104,10 @@ class ScanNodelet : public nodelet::Nodelet
   void configCb(Config &config, uint32_t level);
 
   void imageCb(const sensor_msgs::ImageConstPtr& image_msg,
-                          const sensor_msgs::CameraInfoConstPtr& info_msg);
+               const sensor_msgs::CameraInfoConstPtr& info_msg);
 
   sensor_msgs::LaserScanPtr convert_msg(const sensor_msgs::ImageConstPtr& depth_msg,
-            const sensor_msgs::CameraInfoConstPtr& info_msg);
+                                        const sensor_msgs::CameraInfoConstPtr& info_msg);
   
   /**
    * Sets the scan time parameter.
@@ -257,7 +257,7 @@ private:
   
   image_geometry::PinholeCameraModel cam_model_; ///< image_geometry helper class for managing sensor_msgs/CameraInfo messages.
   
-
+  // Declare parameters
 
   int h_x_offset_;
   int h_y_offset_;
