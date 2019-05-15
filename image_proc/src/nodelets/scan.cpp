@@ -114,6 +114,10 @@ namespace image_proc
 
         // Publisher WFI junctionness
         pub_wfi_junctionness_ = nh_wfi.advertise<std_msgs::Float32>("junctionness", 10);
+
+        // Publisher horizontal laserscan
+        pub_h_laserscan_ = nh_wfi.advertise<sensor_msgs::LaserScan>("scan", 10);
+
     };
 
     void ScanNodelet::connectCb()
@@ -251,6 +255,13 @@ namespace image_proc
         // sensor_msgs::LaserScanPtr scan_msg = ScanNodelet::convert_msg(const sensor_msgs::ImageConstPtr& image_msg,
         //     const sensor_msgs::CameraInfoConstPtr& info_msg)
             
+        ///////////////////////////////
+        // Get Horizontal Laser Scan //
+        ///////////////////////////////
+
+        sensor_msgs::LaserScanPtr h_laserscan_msg = convert_msg(image_msg, info_msg);
+        pub_h_laserscan_.publish(h_laserscan_msg);
+
         Config config;
         {
         boost::lock_guard<boost::recursive_mutex> lock(config_mutex_);

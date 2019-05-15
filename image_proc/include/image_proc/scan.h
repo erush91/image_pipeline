@@ -84,6 +84,7 @@ class ScanNodelet : public nodelet::Nodelet
   ros::Publisher pub_wfi_v_fourier_coefficients_;
   ros::Publisher pub_wfi_control_commands_;
   ros::Publisher pub_wfi_junctionness_;
+  ros::Publisher pub_h_laserscan_;
 
   ros::NodeHandle nh;
   ros::NodeHandle private_nh;
