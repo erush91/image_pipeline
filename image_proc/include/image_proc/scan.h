@@ -257,6 +257,18 @@ private:
   
   image_geometry::PinholeCameraModel cam_model_; ///< image_geometry helper class for managing sensor_msgs/CameraInfo messages.
   
+
+
+  int h_x_offset_;
+  int h_y_offset_;
+  int h_width_;
+  int h_height_;
+
+  int v_x_offset_;
+  int v_y_offset_;
+  int v_width_;
+  int v_height_;
+  
   float scan_time_; ///< Stores the time between scans.
   float range_min_; ///< Stores the current minimum range to use.
   float range_max_; ///< Stores the current maximum range to use.

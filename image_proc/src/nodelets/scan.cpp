@@ -177,7 +177,7 @@ namespace image_proc
     }
 
     sensor_msgs::LaserScanPtr ScanNodelet::convert_msg(const sensor_msgs::ImageConstPtr& depth_msg,
-            const sensor_msgs::CameraInfoConstPtr& info_msg)
+                                                       const sensor_msgs::CameraInfoConstPtr& info_msg)
     {
         // Set camera model
         cam_model_.fromCameraInfo(info_msg);
@@ -206,7 +206,7 @@ namespace image_proc
         }
         scan_msg->angle_min = angle_min;
         scan_msg->angle_max = angle_max;
-        scan_msg->angle_increment = (scan_msg->angle_max - scan_msg->angle_min) / (depth_msg->width - 1)*1.28;
+        scan_msg->angle_increment = (scan_msg->angle_max - scan_msg->angle_min) / (depth_msg->width - 1) * 1.28;
         scan_msg->time_increment = 0.0;
         scan_msg->scan_time = scan_time_;
         scan_msg->range_min = range_min_;
@@ -254,13 +254,13 @@ namespace image_proc
 
         // sensor_msgs::LaserScanPtr scan_msg = ScanNodelet::convert_msg(const sensor_msgs::ImageConstPtr& image_msg,
         //     const sensor_msgs::CameraInfoConstPtr& info_msg)
-            
-        ///////////////////////////////
-        // Get Horizontal Laser Scan //
-        ///////////////////////////////
 
         sensor_msgs::LaserScanPtr h_laserscan_msg = convert_msg(image_msg, info_msg);
         pub_h_laserscan_.publish(h_laserscan_msg);
+
+        ////////////////////////////
+        // Get Dynamic Parameters //
+        ////////////////////////////
 
         Config config;
         {
@@ -268,8 +268,28 @@ namespace image_proc
         config = config_;
         }
 
-        int max_h_width = image_msg->width - config.h_x_offset;
-        int max_h_height = image_msg->height - config.h_y_offset;
+        h_x_offset_ = config.h_x_offset;
+        h_y_offset_ = config.h_y_offset;
+        h_width_ = config.h_width;
+        h_height_ = config.h_height;
+
+        v_x_offset_ = config.v_x_offset;
+        v_y_offset_ = config.v_y_offset;
+        v_width_ = config.v_width;
+        v_height_ = config.v_height;
+
+        scan_time_ = config.scan_time;
+        range_min_ = config.range_min;
+        range_max_ = config.range_max;
+        scan_height_ = config.scan_height;
+        output_frame_id_ = config.output_frame_id;
+
+        ///////////////////////////////
+        // Get Horizontal Laser Scan //
+        ///////////////////////////////
+
+        int max_h_width = image_msg->width - h_x_offset_;
+        int max_h_height = image_msg->height - h_y_offset_;
         int h_width = config.h_width;
         int h_height = config.h_height;
 
@@ -278,14 +298,14 @@ namespace image_proc
         if (h_height == 0 || h_height > max_h_height)
         h_height = max_h_height;
 
-        int max_v_width = image_msg->width - config.v_x_offset;
-        int max_v_height = image_msg->height - config.v_y_offset;
+        int max_v_width = image_msg->width - v_x_offset_;
+        int max_v_height = image_msg->height - v_y_offset_;
         int v_width = config.v_width;
         int v_height = config.v_height;
 
-        if (v_width == 0 || v_width > max_v_width)
+        if (v_width_ == 0 || v_width_ > max_v_width)
         v_width = max_v_width;
-        if (v_height == 0 || v_height > max_v_height)
+        if (v_height_ == 0 || v_height_ > max_v_height)
         v_height = max_v_height;
 
         // Get h_a cv::Mat view of the source data
@@ -299,9 +319,9 @@ namespace image_proc
         CvImage h_scans_float(source->header, source->encoding);
         CvImage h_scan(source->header, "32FC1");
 
-        h_scans.image = source->image(cv::Rect(config.h_x_offset, config.h_y_offset, h_width, h_height));
-        h_scans_float.image = source->image(cv::Rect(config.h_x_offset, config.h_y_offset, h_width, h_height));
-        h_scan.image = source->image(cv::Rect(config.h_x_offset, config.h_y_offset, h_width, 1));
+        h_scans.image = source->image(cv::Rect(h_x_offset_, h_y_offset_, h_width, h_height));
+        h_scans_float.image = source->image(cv::Rect(h_x_offset_, h_y_offset_, h_width, h_height));
+        h_scan.image = source->image(cv::Rect(h_x_offset_, h_y_offset_, h_width, 1));
 
         ///////////////////////////////
         // Get Seleted Vertical Rows //
@@ -311,9 +331,9 @@ namespace image_proc
         CvImage v_scans_float(source->header, source->encoding);
         CvImage v_scan(source->header, "32FC1");
 
-        v_scans.image = source->image(cv::Rect(config.v_x_offset, config.v_y_offset, v_width, v_height));
-        v_scans_float.image = source->image(cv::Rect(config.v_x_offset, config.v_y_offset, v_width, v_height));
-        v_scan.image = source->image(cv::Rect(config.v_x_offset, config.v_y_offset, 1, v_height));
+        v_scans.image = source->image(cv::Rect(v_x_offset_, v_y_offset_, v_width, v_height));
+        v_scans_float.image = source->image(cv::Rect(v_x_offset_, v_y_offset_, v_width, v_height));
+        v_scan.image = source->image(cv::Rect(v_x_offset_, v_y_offset_, 1, v_height));
 
         ////////////////////////////////////
         // Calculate Horizontal Line Scan //
@@ -346,8 +366,8 @@ namespace image_proc
         int h_binning_y = std::max((int)info_msg->binning_y, 1);
         out_h_info->binning_x = h_binning_x;
         out_h_info->binning_y = h_binning_y;
-        out_h_info->roi.x_offset += config.h_x_offset * h_binning_x;
-        out_h_info->roi.y_offset += config.h_y_offset * h_binning_y;
+        out_h_info->roi.x_offset += h_x_offset_ * h_binning_x;
+        out_h_info->roi.y_offset += h_y_offset_ * h_binning_y;
         out_h_info->roi.width = h_width * h_binning_x;
         out_h_info->roi.height = h_height * h_binning_y;
         
@@ -378,8 +398,8 @@ namespace image_proc
         int v_binning_y = std::max((int)info_msg->binning_y, 1);
         out_v_info->binning_x = v_binning_x;
         out_v_info->binning_y = v_binning_y;
-        out_v_info->roi.x_offset += config.v_x_offset * v_binning_x;
-        out_v_info->roi.y_offset += config.v_y_offset * v_binning_y;
+        out_v_info->roi.x_offset += v_x_offset_ * v_binning_x;
+        out_v_info->roi.y_offset += v_y_offset_ * v_binning_y;
         out_v_info->roi.width = v_width * v_binning_x;
         out_v_info->roi.height = v_height * v_binning_y;
         
