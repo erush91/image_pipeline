@@ -296,7 +296,7 @@ private:
   int h_height_cropped;
   cv::Mat h_depth_sat;
   cv::Mat v_depth_sat;
-  float h_a_0, h_a[4], h_b[4]; // *** TO DO: Remove hard-coded length ***
+  float h_a_0, h_a_1, h_a[4], h_b[4]; // *** TO DO: Remove hard-coded length ***
   float h_a_2;
   float wfi_forward_velocity_control;
   float wfi_yaw_rate_control;

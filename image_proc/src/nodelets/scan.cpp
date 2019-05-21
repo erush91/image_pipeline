@@ -777,8 +777,19 @@ namespace image_proc
 
         std_msgs::Float32 wfi_junctionness;
 
+        float i0 = 2/(h_a_0 * M_PI);
+        
+        const float i0_0 = 22; // 2.4 // Nominal value for a0 when in a tunnel
+        const float g_i0 = 1.0/2.5; // 1/0.8;
+
+        const float a1_0 = 0.0404; // 0.06;
+        const float g_a1 = 1/0.015; // 1/0.04;
+
+        float h0 = g_i0 * (i0 - i0_0); // Opening Indicator
+        float h1 = g_a1 * (h_a_1 - a1_0); // Dead End Indicator
+
         // ***** THIS IS NOT ROBUST (FALSE POSITIVES/NEGATIVES) ***
-        wfi_junctionness.data = 1.8 * h_a_2 - h_a_0;
+        wfi_junctionness.data = h0 - h1; // If(J > 0.5)-->Opening // If(J < -0.5)-->Dead End 
 
         pub_wfi_junctionness_.publish(wfi_junctionness);
 
