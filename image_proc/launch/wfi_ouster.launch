@@ -1,0 +1,49 @@
+<launch>
+
+    <arg name="camera"      default="camera"/>
+    <arg name="bond"        default="false" />
+    <arg name="respawn"     default="$(arg bond)" />
+    <arg name="manager"     default="pcl2laser_manager"/>
+
+    <!-- Static Transform for Ouster -->
+    <node pkg="tf" type="static_transform_publisher" name="link1_broadcaster" args="1 0 0 0 0 0 1 world /os1_lidar 100" />
+
+    <!-- Nodelet Manager -->
+    <node pkg="nodelet" type="nodelet" name="$(arg manager)" args="manager" output="screen"/>
+
+    <!-- PCL to Laserscan Nodelet -->
+    <node pkg="nodelet" type="nodelet" output="screen"
+
+        args="load pointcloud_to_laserscan/pointcloud_to_laserscan_nodelet $(arg manager)"
+        name="pcl2laser">
+
+        <!-- <param name="target_frame" type="str" value="os1_lidar" /> -->
+        <param name="min_height" type="double" value="0.0" />
+        <param name="max_height" type="double" value="1.0" />
+        <param name="min_range" type="double" value="0" />
+        <param name="max_range" type="double" value="1000" />
+        <param name="angle_min" type="double" value="-3.14159265359" />
+        <param name="angle_max" type="double" value="3.14159265359" />
+        <param name="angle_increment" type="double" value="0.00872664625" />
+        <param name="use_inf" type="boolean" value="true" />
+
+        <remap from="/os1_lidar" to="os1_lidar"/>
+
+        <remap from="cloud_in" to="/os1_cloud_node/points"/>
+
+        <remap from="scan" to="pcl2laser/laserscan"/>
+
+    </node>
+
+    <node pkg="topic_tools" type="relay" name="laserscan_relay" args="pcl2laser/laserscan wfi/horiz/scan" >
+    </node>
+
+    <!-- Gene's WFI Nodelet -->
+    <node pkg="nodelet" type="nodelet" output="screen"
+
+          args="load image_proc/scan $(arg manager) $(arg bond)" respawn="$(arg respawn)"
+          name="image_proc_scan">
+        
+    </node>  
+      
+</launch>

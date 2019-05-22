@@ -70,7 +70,8 @@ class ScanNodelet : public nodelet::Nodelet
 
   // ROS communication
   boost::shared_ptr<image_transport::ImageTransport> it_in_, it_out_;
-  image_transport::CameraSubscriber sub_;
+  image_transport::CameraSubscriber sub_depth_image_;
+  ros::Subscriber sub_laserscan_;
   int queue_size_;
   std::string target_frame_id_;
   boost::mutex connect_mutex_;
@@ -106,13 +107,15 @@ class ScanNodelet : public nodelet::Nodelet
   void imageCb(const sensor_msgs::ImageConstPtr& image_msg,
                const sensor_msgs::CameraInfoConstPtr& info_msg);
 
+  void laserscanCb(const sensor_msgs::LaserScan laserscan_msg);
+
   void get_h_strip(const sensor_msgs::ImageConstPtr& image_msg,
                    const sensor_msgs::CameraInfoConstPtr& info_msg);
 
   void get_v_strip(const sensor_msgs::ImageConstPtr& image_msg,
                    const sensor_msgs::CameraInfoConstPtr& info_msg);
 
-  void calc_h_wfi_fourier_coefficients();
+  void calc_h_wfi_fourier_coefficients(int h_width_cropped);
 
   void calc_v_wfi_fourier_coefficients();
 
@@ -296,6 +299,7 @@ private:
   int h_height_cropped;
   cv::Mat h_depth_sat;
   cv::Mat v_depth_sat;
+  cv::Mat h_depth_raw;
   float h_a_0, h_a_1, h_a[4], h_b[4]; // *** TO DO: Remove hard-coded length ***
   float h_a_2;
   float wfi_forward_velocity_control;

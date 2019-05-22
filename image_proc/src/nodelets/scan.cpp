@@ -62,6 +62,7 @@ namespace image_proc
         nh         = getNodeHandle();
         private_nh = getPrivateNodeHandle();
         ros::NodeHandle nh_wfi (nh, "wfi");
+        ros::NodeHandle nh_pcl2laser (nh, "pcl2laser");
         ros::NodeHandle nh_in (nh, "camera");
         ros::NodeHandle nh_out(nh, "camera_out");
         it_in_ .reset(new image_transport::ImageTransport(nh_in));
@@ -83,7 +84,12 @@ namespace image_proc
         // Make sure we don't enter connectCb() between advertising and assigning to pub_h_scans_
         boost::lock_guard<boost::mutex> lock(connect_mutex_);
         image_transport::TransportHints hints("raw", ros::TransportHints(), getPrivateNodeHandle());
-        sub_ = it_in_->subscribeCamera("image_raw", queue_size_, &ScanNodelet::imageCb, this, hints);
+
+        // Subscriber RealSense depth image
+        sub_depth_image_ = it_in_->subscribeCamera("image_raw", queue_size_, &ScanNodelet::imageCb, this, hints);
+
+        // Subscriber Laserscan
+        sub_laserscan_ = nh_pcl2laser.subscribe("laserscan", 1, &ScanNodelet::laserscanCb, this);
 
         // Publisher rows of depth image used in horizontal line scan
         pub_h_scans_ = it_out_->advertiseCamera("h_scans",  1, connect_cb, connect_cb, connect_cb_info, connect_cb_info);
@@ -97,10 +103,10 @@ namespace image_proc
         // Publisher vertical line scan
         pub_wfi_v_scan_ = nh_wfi.advertise<std_msgs::Float32MultiArray>("vert/scan", 10);
 
-        // Publisher horizontal nearnes
+        // Publisher horizontal nearness
         pub_wfi_h_nearness_ = nh_wfi.advertise<std_msgs::Float32MultiArray>("horiz/nearness", 10);
 
-        // Publisher vertical nearnes
+        // Publisher vertical nearness
         pub_wfi_v_nearness_ = nh_wfi.advertise<std_msgs::Float32MultiArray>("vert/nearness", 10);
 
         // Publisher horizontaol Fourier coefficients
@@ -443,15 +449,16 @@ namespace image_proc
         return scan_msg;
     }
 
-    void ScanNodelet::calc_h_wfi_fourier_coefficients()
+    void ScanNodelet::calc_h_wfi_fourier_coefficients(int h_num_points)
     {
 
+
+        std::cout << h_depth_sat << std::endl;
+        
         //////////////////////////////////
         // Declare horizontal variables //
         //////////////////////////////////
 
-        int h_num_points;
-        h_num_points = h_width_cropped;
         int h_num_fourier_terms;
         h_num_fourier_terms = 4;
         float h_fourier_terms;
@@ -704,14 +711,13 @@ namespace image_proc
         wfi_yaw_rate_control = yaw_rate_min;
         if(wfi_yaw_rate_control > yaw_rate_max)
         wfi_yaw_rate_control = yaw_rate_max;
-    }
+    };
 
     void ScanNodelet::imageCb(const sensor_msgs::ImageConstPtr& image_msg,
-                            const sensor_msgs::CameraInfoConstPtr& info_msg)
+                              const sensor_msgs::CameraInfoConstPtr& info_msg)
     {
 
         // Get parameters
-
         Config config;
         {
             boost::lock_guard<boost::recursive_mutex> lock(config_mutex_);
@@ -732,7 +738,7 @@ namespace image_proc
         range_min_ = config.range_min;
         range_max_ = config.range_max;
         scan_height_ = config.scan_height;
-        output_frame_id_ = config.output_frame_id; 
+        output_frame_id_ = config.output_frame_id;
 
         // Publish horizontal laserscan (from depthimage_to_laserscan, accurate)
         sensor_msgs::LaserScanPtr h_laserscan_msg = depthimage_to_horiz_laserscan(image_msg, info_msg);
@@ -745,7 +751,83 @@ namespace image_proc
         get_v_strip(image_msg, info_msg);
 
         // Calculate horizontal WFI Fourier coefficients
-        calc_h_wfi_fourier_coefficients();
+        calc_h_wfi_fourier_coefficients(h_width_cropped);
+
+        // Calculate vertical WFI Fourier coefficients
+        calc_v_wfi_fourier_coefficients();
+
+        // Calculate forward velocity command
+        calc_forward_velocity_command();
+
+        // Calculate yaw rate command
+        calc_yaw_rate_command();
+        
+        //////////////////////////////////
+        // Publish WFI control commands //
+        //////////////////////////////////
+
+        geometry_msgs::Twist wfi_control_command;
+
+        wfi_control_command.linear.x = wfi_forward_velocity_control;
+        wfi_control_command.linear.y = 0;
+        wfi_control_command.linear.z = 0;
+        wfi_control_command.angular.x = 0;
+        wfi_control_command.angular.y = 0;
+        wfi_control_command.angular.z = wfi_yaw_rate_control;
+
+        pub_wfi_control_commands_.publish(wfi_control_command);
+
+        //////////////////////////////
+        // Calculation Junctionness //
+        //////////////////////////////
+
+        std_msgs::Float32 wfi_junctionness;
+
+        float i0 = 2/(h_a_0 * M_PI);
+        
+        const float i0_0 = 22; // 2.4 // Nominal value for a0 when in a tunnel
+        const float g_i0 = 1.0/2.5; // 1/0.8;
+
+        const float a1_0 = 0.0404; // 0.06;
+        const float g_a1 = 1/0.015; // 1/0.04;
+
+        float h0 = g_i0 * (i0 - i0_0); // Opening Indicator
+        float h1 = g_a1 * (h_a_1 - a1_0); // Dead End Indicator
+
+        // ***** THIS IS NOT ROBUST (FALSE POSITIVES/NEGATIVES) ***
+        wfi_junctionness.data = h0 - h1; // If(J > 0.5)-->Opening // If(J < -0.5)-->Dead End 
+
+        pub_wfi_junctionness_.publish(wfi_junctionness);
+
+    };
+
+    void ScanNodelet::laserscanCb(const sensor_msgs::LaserScan laserscan_msg)
+    {
+
+        // Get parameters
+        Config config;
+        {
+            boost::lock_guard<boost::recursive_mutex> lock(config_mutex_);
+            config = config_;
+        }
+
+        std::vector<float> h_depth_vector = laserscan_msg.ranges;
+        int h_scan_length = h_depth_vector.size();
+
+        h_depth_sat = cv::Mat(1,h_scan_length,CV_32FC1);;
+        std::memcpy(h_depth_sat.data,h_depth_vector.data(),h_depth_vector.size()*sizeof(float));
+        
+        ////////////////////////////////////
+        // Saturate horizontal depth scan //
+        ////////////////////////////////////
+
+        h_depth_sat.setTo(0.5, h_depth_sat < 0.5);
+        h_depth_sat.setTo(10, h_depth_sat > 10);
+        
+        std::cout << h_depth_sat << std::endl;
+
+        // Calculate horizontal WFI Fourier coefficients
+        calc_h_wfi_fourier_coefficients(h_scan_length);
 
         // Calculate vertical WFI Fourier coefficients
         calc_v_wfi_fourier_coefficients();
