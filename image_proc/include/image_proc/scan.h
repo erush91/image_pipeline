@@ -115,7 +115,7 @@ class ScanNodelet : public nodelet::Nodelet
   void get_v_strip(const sensor_msgs::ImageConstPtr& image_msg,
                    const sensor_msgs::CameraInfoConstPtr& info_msg);
 
-  void calc_h_wfi_fourier_coefficients(int h_width_cropped);
+  void calc_h_wfi_fourier_coefficients(int h_width_cropped, float h_gamma_start_FOV, float h_gamma_end_FOV);
 
   void calc_v_wfi_fourier_coefficients();
 
@@ -304,6 +304,8 @@ private:
   float h_a_2;
   float wfi_forward_velocity_control;
   float wfi_yaw_rate_control;
+  float h_gamma_start_FOV;
+  float h_gamma_end_FOV;
   
 
 

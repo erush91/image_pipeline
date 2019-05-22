@@ -31,11 +31,12 @@
 
         <remap from="cloud_in" to="/os1_cloud_node/points"/>
 
-        <remap from="scan" to="pcl2laser/laserscan"/>
+        <remap from="scan" to="pcl2laser/horiz/laser_scan"/>
 
     </node>
 
-    <node pkg="topic_tools" type="relay" name="laserscan_relay" args="pcl2laser/laserscan wfi/horiz/scan" >
+    <!-- Gene's WFI Nodelet -->
+    <node pkg="topic_tools" type="relay" name="laserscan_relay" args="pcl2laser/horiz/laser_scan wfi/horiz/laser_scan" >
     </node>
 
     <!-- Gene's WFI Nodelet -->

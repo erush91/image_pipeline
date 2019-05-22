@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # ~~ Setting and Constants ~~
-numReadings   = 580
+numReadings   = 720
 threshold     =   9.0
 preturn_thresh = 5.0
 plotCarts     =   1
@@ -35,19 +35,24 @@ b_2_history = [0]*len_hist
 forward_speed_history = [0]*len_hist
 yaw_rate_history = [0]*len_hist
 
-def scan_cb( msg ):
+def image_scan_cb( msg ):
     global lastDepthScan
-    """ Process the scan that comes back from the scanner """
-    lastDepthScan = msg.data  #lastDepthScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
+    """ Process the depth image scan message """
+    lastDepthScan = msg.data  #lastDepthImageScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
+
+def laser_scan_cb( msg ):
+    global lastDepthScan
+    """ Process the laser scan message """
+    lastDepthScan = msg.ranges  #lastDepthLaserScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
 
 def nearness_cb( msg ):
     global lastNearnessScan
-    """ Process the scan that comes back from the scanner """
-    lastNearnessScan = msg.data  #lastDepthScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
+    """ Process the nearness array """
+    lastNearnessScan = msg.data  #lastDepthImageScan = [ elem/25.50 for elem in msg.data ] # scale [0,255] to [0,10]
     
 def wfi_fourier_coeffs_cb(msg):
     global a_0, a_1, a_2, b_1, b_2
-    """ Process the scan that comes back from the scanner """
+    """ Process the Fourier coefficients """
     a_0 = msg.a_0
     a_1 = msg.a[0]
     a_2 = msg.a[1]
@@ -82,8 +87,8 @@ def polr_2_cart_0Y( polarCoords ): # 0 angle is +Y North
     """ Convert polar coordinates [radius , angle (radians)] to cartesian [x , y]. Theta = 0 is UP = Y+ """
     return [ polarCoords[0] * sin( polarCoords[1] ) , polarCoords[0] * cos(polarCoords[1])  ]
 
-minAng = -pi/4.0
-maxAng = minAng + pi/2.0
+minAng = -pi
+maxAng = pi
 
 def cart_scan( arr ):
     """ Represent the points in cartesian coordinates """
@@ -93,10 +98,11 @@ def cart_scan( arr ):
 
 rospy.init_node( 'scan_plot' , anonymous = True )
 	
-rospy.Subscriber( "camera/wfi/horiz/scan" , Float32MultiArray , scan_cb )
-rospy.Subscriber( "camera/wfi/horiz/nearness" , Float32MultiArray , nearness_cb )
-rospy.Subscriber( "camera/wfi/horiz/fourier_coefficients" , FourierCoefsMsg , wfi_fourier_coeffs_cb )
-rospy.Subscriber( "camera/wfi/control_commands" , Twist , wfi_control_command_cb )
+rospy.Subscriber( "wfi/horiz/image_scan" , Float32MultiArray , image_scan_cb )
+rospy.Subscriber( "wfi/horiz/laser_scan" , LaserScan , laser_scan_cb )
+rospy.Subscriber( "wfi/horiz/nearness" , Float32MultiArray , nearness_cb )
+rospy.Subscriber( "wfi/horiz/fourier_coefficients" , FourierCoefsMsg , wfi_fourier_coeffs_cb )
+rospy.Subscriber( "wfi/control_commands" , Twist , wfi_control_command_cb )
 
 try:
 	while ( not rospy.is_shutdown() ):
@@ -111,8 +117,8 @@ try:
 		# plt.figure(num=1, figsize=(9, 6), dpi=80, facecolor='w', edgecolor='k')	
 		plt.plot( lastDepthScanNP , 'b.' )
 		plt.hold( False )
-		plt.xlim( [ 0 , 580 ] )
-		plt.ylim( [ 0 , 10 ] )
+		plt.xlim( [ 0 , 720 ] )
+		plt.ylim( [ 0 , 30 ] )
 		plt.xlabel("Array Index")
 		plt.ylabel("Depth [m]")
 		plt.title("Horiz. Depth (Array Values)")
@@ -126,19 +132,19 @@ try:
 		plt.scatter( X , Y ,c="k",marker=".")
 		plt.axis( 'equal' )
 		plt.grid( True )
-		plt.xlim( [ -8 , 8 ] )
-		plt.ylim( [   0 , 10 ] )
+		plt.xlim( [ -30 , 30 ] )
+		plt.ylim( [ -30 , 30 ] )
 		plt.xlabel("X [m]")
 		plt.ylabel("Y [m]")
-		plt.title("Horiz. Depth (X-Y Coordinates)")
+		plt.title("Horiz. Depth (X [m] vs Y [m])")
 		
 		plt.subplot(2,3,4)
 		# Figure 3, Horizontal Nearness: Array Index vs. Nearness [1/m]
 		# plt.figure(num=3, figsize=(9, 6), dpi=80, facecolor='w', edgecolor='k')	
 		plt.plot( lastNearnessScanNP , 'b.' )
 		plt.hold( False )
-		plt.xlim( [ 0 , 580 ] )
-		plt.ylim( [ 0 , 2 ] )
+		plt.xlim( [ 0 , 720 ] )
+		plt.ylim( [ 0 , 1 ] )
 		plt.xlabel("Array Index")
 		plt.ylabel("Nearness [1/m]")
 		plt.title("Horiz. Nearness (Array Values)")
@@ -152,11 +158,11 @@ try:
 		plt.scatter( X , Y ,c="k",marker=".")
 		plt.axis( 'equal' )
 		plt.grid( True )
-		plt.xlim( [ -8 , 8 ] )
-		plt.ylim( [   0 , 2 ] )
+		plt.xlim( [ -2 , 2 ] )
+		plt.ylim( [   -2 , 2 ] )
 		plt.xlabel("X [1/m]")
 		plt.ylabel("Y [1/m]")
-		plt.title("Horizontal Nearness Scan: X [m] vs Y [m]")
+		plt.title("Horizontal Nearness Scan: 1/X [1/m] vs 1/Y [1/m]")
 
 		# plt.figure(3)
 		# points = cart_scan( lastNearnessScanNP )

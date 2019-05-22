@@ -89,7 +89,7 @@ namespace image_proc
         sub_depth_image_ = it_in_->subscribeCamera("image_raw", queue_size_, &ScanNodelet::imageCb, this, hints);
 
         // Subscriber Laserscan
-        sub_laserscan_ = nh_pcl2laser.subscribe("laserscan", 1, &ScanNodelet::laserscanCb, this);
+        sub_laserscan_ = nh_pcl2laser.subscribe("horiz/laser_scan", 1, &ScanNodelet::laserscanCb, this);
 
         // Publisher rows of depth image used in horizontal line scan
         pub_h_scans_ = it_out_->advertiseCamera("h_scans",  1, connect_cb, connect_cb, connect_cb_info, connect_cb_info);
@@ -98,10 +98,10 @@ namespace image_proc
         pub_v_scans_ = it_out_->advertiseCamera("v_scans",  1, connect_cb, connect_cb, connect_cb_info, connect_cb_info);
         
         // Publisher horizontal line scan
-        pub_wfi_h_scan_ = nh_wfi.advertise<std_msgs::Float32MultiArray>("horiz/scan", 10);
+        pub_wfi_h_scan_ = nh_wfi.advertise<std_msgs::Float32MultiArray>("horiz/image_scan", 10);
 
         // Publisher vertical line scan
-        pub_wfi_v_scan_ = nh_wfi.advertise<std_msgs::Float32MultiArray>("vert/scan", 10);
+        pub_wfi_v_scan_ = nh_wfi.advertise<std_msgs::Float32MultiArray>("vert/imagescan", 10);
 
         // Publisher horizontal nearness
         pub_wfi_h_nearness_ = nh_wfi.advertise<std_msgs::Float32MultiArray>("horiz/nearness", 10);
@@ -363,7 +363,7 @@ namespace image_proc
         cv::transpose(v_scan.image, v_depth_sat);
         
         v_depth_sat.setTo(0.5, v_depth_sat < 0.5);
-        v_depth_sat.setTo(10, v_depth_sat > 10);
+        v_depth_sat.setTo(100, v_depth_sat > 100);
 
         /////////////////////////////////
         // Publish vertical depth scan //
@@ -449,12 +449,9 @@ namespace image_proc
         return scan_msg;
     }
 
-    void ScanNodelet::calc_h_wfi_fourier_coefficients(int h_num_points)
+    void ScanNodelet::calc_h_wfi_fourier_coefficients(int h_num_points, float h_gamma_start_FOV, float h_gamma_end_FOV)
     {
 
-
-        std::cout << h_depth_sat << std::endl;
-        
         //////////////////////////////////
         // Declare horizontal variables //
         //////////////////////////////////
@@ -471,19 +468,13 @@ namespace image_proc
         float h_sin_gamma_arr[h_num_fourier_terms][h_num_points];
         // float h_a_0, h_a[h_num_fourier_terms], h_b[h_num_fourier_terms];
 
-        float h_gamma_start_FOV;
-        float h_gamma_end_FOV;
-        float h_gamma_range_FOV;
-        float h_gamma_delta_FOV;
-    
+   
         ////////////////////////////////////
         // Intialize horizontal variables //
         ////////////////////////////////////
 
-        h_gamma_start_FOV = -0.25 * M_PI;
-        h_gamma_end_FOV = 0.25 * M_PI;
-        h_gamma_range_FOV = h_gamma_end_FOV - h_gamma_start_FOV;
-        h_gamma_delta_FOV = h_gamma_range_FOV / h_num_points;
+        float h_gamma_range_FOV = h_gamma_end_FOV - h_gamma_start_FOV;
+        float h_gamma_delta_FOV = h_gamma_range_FOV / h_num_points;
 
         ///////////////////////////////////
         // Calculate horizontal nearness //
@@ -750,8 +741,11 @@ namespace image_proc
         // Publish vertical laserscan (direct from depth image, distorted)
         get_v_strip(image_msg, info_msg);
 
+        h_gamma_start_FOV = -0.25 * M_PI;
+        h_gamma_end_FOV = 0.25 * M_PI;
+
         // Calculate horizontal WFI Fourier coefficients
-        calc_h_wfi_fourier_coefficients(h_width_cropped);
+        calc_h_wfi_fourier_coefficients(h_width_cropped, h_gamma_start_FOV, h_gamma_end_FOV);
 
         // Calculate vertical WFI Fourier coefficients
         calc_v_wfi_fourier_coefficients();
@@ -822,12 +816,13 @@ namespace image_proc
         ////////////////////////////////////
 
         h_depth_sat.setTo(0.5, h_depth_sat < 0.5);
-        h_depth_sat.setTo(10, h_depth_sat > 10);
-        
-        std::cout << h_depth_sat << std::endl;
+        h_depth_sat.setTo(100, h_depth_sat > 100);
+
+        h_gamma_start_FOV = -M_PI;
+        h_gamma_end_FOV = M_PI;
 
         // Calculate horizontal WFI Fourier coefficients
-        calc_h_wfi_fourier_coefficients(h_scan_length);
+        calc_h_wfi_fourier_coefficients(h_scan_length, h_gamma_start_FOV, h_gamma_end_FOV);
 
         // Calculate vertical WFI Fourier coefficients
         calc_v_wfi_fourier_coefficients();
