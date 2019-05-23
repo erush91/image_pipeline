@@ -122,7 +122,7 @@ namespace image_proc
         pub_wfi_junctionness_ = nh_wfi.advertise<std_msgs::Float32>("junctionness", 10);
 
         // Publisher horizontal laserscan
-        pub_h_laserscan_ = nh_wfi.advertise<sensor_msgs::LaserScan>("scan", 10);
+        pub_h_laserscan_ = nh_wfi.advertise<sensor_msgs::LaserScan>("horiz/laser_scan", 10);
 
     };
 
@@ -689,8 +689,8 @@ namespace image_proc
         float h_K_2 =  0.5; // 0.575;
 
         // Fourier coefficient
-        float h_b_1 = h_b[1];
-        float h_b_2 = h_b[2];
+        float h_b_1 = h_b[0];
+        float h_b_2 = h_b[1];
 
         wfi_yaw_rate_control = h_K_1 * h_b_1 + h_K_2 * h_b_2;
 
@@ -744,8 +744,14 @@ namespace image_proc
         h_gamma_start_FOV = -0.25 * M_PI;
         h_gamma_end_FOV = 0.25 * M_PI;
 
+        std::vector<float> h_depth_vector = h_laserscan_msg->ranges;
+        int h_scan_length = h_depth_vector.size();
+
+        h_depth_sat = cv::Mat(1,h_scan_length,CV_32FC1);
+        std::memcpy(h_depth_sat.data,h_depth_vector.data(),h_depth_vector.size()*sizeof(float));
+
         // Calculate horizontal WFI Fourier coefficients
-        calc_h_wfi_fourier_coefficients(h_width_cropped, h_gamma_start_FOV, h_gamma_end_FOV);
+        calc_h_wfi_fourier_coefficients(h_scan_length, h_gamma_start_FOV, h_gamma_end_FOV);
 
         // Calculate vertical WFI Fourier coefficients
         calc_v_wfi_fourier_coefficients();
@@ -795,7 +801,7 @@ namespace image_proc
 
     };
 
-    void ScanNodelet::laserscanCb(const sensor_msgs::LaserScan laserscan_msg)
+    void ScanNodelet::laserscanCb(const sensor_msgs::LaserScan h_laserscan_msg)
     {
 
         // Get parameters
@@ -805,7 +811,7 @@ namespace image_proc
             config = config_;
         }
 
-        std::vector<float> h_depth_vector = laserscan_msg.ranges;
+        std::vector<float> h_depth_vector = h_laserscan_msg.ranges;
         int h_scan_length = h_depth_vector.size();
 
         h_depth_sat = cv::Mat(1,h_scan_length,CV_32FC1);;

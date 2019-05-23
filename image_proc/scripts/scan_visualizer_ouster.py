@@ -25,7 +25,7 @@ global forward_speed, yaw_rate
 lastDepthScan = [ 0 for i in range( numReadings ) ]
 lastNearnessScan = [ 0 for i in range( numReadings ) ]
 car_state = ''
-len_hist = 1000
+len_hist = 500
 a_0_history = [0]*len_hist
 a_1_history = [0]*len_hist
 a_2_history = [0]*len_hist
@@ -112,7 +112,7 @@ try:
 		plt.clf() # Clear all figures
 
 		plt.figure(1)
-		plt.subplot(2,3,1)
+		plt.subplot(2,2,1)
 		# Figure 1, Horizontal Depth Scan: Array Index vs. Depth [m]
 		# plt.figure(num=1, figsize=(9, 6), dpi=80, facecolor='w', edgecolor='k')	
 		plt.plot( lastDepthScanNP , 'b.' )
@@ -123,7 +123,7 @@ try:
 		plt.ylabel("Depth [m]")
 		plt.title("Horiz. Depth (Array Values)")
 
-		plt.subplot(2,3,2)
+		plt.subplot(2,2,2)
 		# Figure 2, Horizontal Depth Scan: X [m] vs Y [m]
 		# plt.figure(num=2, figsize=(9, 6), dpi=80, facecolor='w', edgecolor='k')	
 		points = cart_scan( lastDepthScanNP )
@@ -138,7 +138,7 @@ try:
 		plt.ylabel("Y [m]")
 		plt.title("Horiz. Depth (X [m] vs Y [m])")
 		
-		plt.subplot(2,3,4)
+		plt.subplot(2,2,3)
 		# Figure 3, Horizontal Nearness: Array Index vs. Nearness [1/m]
 		# plt.figure(num=3, figsize=(9, 6), dpi=80, facecolor='w', edgecolor='k')	
 		plt.plot( lastNearnessScanNP , 'b.' )
@@ -149,7 +149,7 @@ try:
 		plt.ylabel("Nearness [1/m]")
 		plt.title("Horiz. Nearness (Array Values)")
 
-		plt.subplot(2,3,5)
+		plt.subplot(2,2,4)
 		# Figure 2, Horizontal Nearness Scan: X [1/m] vs Y [1/m]
 		# plt.figure(num=4, figsize=(9, 6), dpi=80, facecolor='w', edgecolor='k')	
 		points = cart_scan( lastNearnessScanNP )
@@ -162,7 +162,7 @@ try:
 		plt.ylim( [   -2 , 2 ] )
 		plt.xlabel("X [1/m]")
 		plt.ylabel("Y [1/m]")
-		plt.title("Horizontal Nearness Scan: 1/X [1/m] vs 1/Y [1/m]")
+		plt.title("Horiz. Nearness: 1/X [1/m] vs 1/Y [1/m]")
 
 		# plt.figure(3)
 		# points = cart_scan( lastNearnessScanNP )
