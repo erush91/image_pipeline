@@ -42,8 +42,8 @@
     <!-- Gene's WFI Nodelet -->
     <node pkg="nodelet" type="nodelet" output="screen"
 
-          args="load image_proc/scan $(arg manager) $(arg bond)" respawn="$(arg respawn)"
-          name="image_proc_scan">
+          args="load wfi_from_depth_sensor/scan $(arg manager) $(arg bond)" respawn="$(arg respawn)"
+          name="wfi_from_depth_sensor_scan">
         
     </node>  
       

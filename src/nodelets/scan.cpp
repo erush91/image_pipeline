@@ -466,7 +466,6 @@ namespace wfi_from_depth_sensor
         float h_gamma_arr[h_num_points];
         float h_cos_gamma_arr[h_num_fourier_terms][h_num_points];
         float h_sin_gamma_arr[h_num_fourier_terms][h_num_points];
-        // float h_a_0, h_a[h_num_fourier_terms], h_b[h_num_fourier_terms];
 
    
         ////////////////////////////////////
@@ -512,17 +511,9 @@ namespace wfi_from_depth_sensor
                 h_gamma_arr[j] = h_gamma_start_FOV + h_gamma_delta_FOV * j;
                 h_cos_gamma_arr[i][j] = cos(i * h_gamma_arr[j]);
                 h_sin_gamma_arr[i][j] = sin(i * h_gamma_arr[j]);
-            }
-            
-            if(i == 0)
-            {
-                h_a_0 = h_nearness.dot(h_cos_gamma_mat.row(i)) * h_gamma_delta_FOV / (0.5 * h_gamma_range_FOV);
-            }
-            else if(i > 0)
-            {
-                h_a[i-1] = h_nearness.dot(h_cos_gamma_mat.row(i)) * h_gamma_delta_FOV / (0.5 * h_gamma_range_FOV);
-                h_b[i-1] = h_nearness.dot(h_sin_gamma_mat.row(i)) * h_gamma_delta_FOV / (0.5 * h_gamma_range_FOV);
-            }
+            }           
+            h_a[i] = h_nearness.dot(h_cos_gamma_mat.row(i)) * h_gamma_delta_FOV / (0.5 * h_gamma_range_FOV);
+            h_b[i] = h_nearness.dot(h_sin_gamma_mat.row(i)) * h_gamma_delta_FOV / (0.5 * h_gamma_range_FOV);
         }
 
         /////////////////////////////////////////////////
@@ -536,7 +527,6 @@ namespace wfi_from_depth_sensor
         wfi_from_depth_sensor::FourierCoefsMsg h_wfi_ctrl_cmd_msg;
 
         h_wfi_ctrl_cmd_msg.header.stamp = ros::Time::now();
-        h_wfi_ctrl_cmd_msg.a_0 = h_a_0;
         h_wfi_ctrl_cmd_msg.a = h_a_vector;
         h_wfi_ctrl_cmd_msg.b = h_b_vector;
 
@@ -615,16 +605,8 @@ namespace wfi_from_depth_sensor
                 v_cos_gamma_arr[i][j] = cos(i * v_gamma_arr[j]);
                 v_sin_gamma_arr[i][j] = sin(i * v_gamma_arr[j]);
             }
-            
-            if(i == 0)
-            {
-                v_a_0 = v_nearness.dot(v_cos_gamma_mat.row(i)) * v_gamma_delta_FOV / (0.5 * v_gamma_range_FOV);
-            }
-            else if(i > 0)
-            {
-                v_a[i-1] = v_nearness.dot(v_cos_gamma_mat.row(i)) * v_gamma_delta_FOV / (0.5 * v_gamma_range_FOV);
-                v_b[i-1] = v_nearness.dot(v_sin_gamma_mat.row(i)) * v_gamma_delta_FOV / (0.5 * v_gamma_range_FOV);
-            }
+            v_a[i] = v_nearness.dot(v_cos_gamma_mat.row(i)) * v_gamma_delta_FOV / (0.5 * v_gamma_range_FOV);
+            v_b[i] = v_nearness.dot(v_sin_gamma_mat.row(i)) * v_gamma_delta_FOV / (0.5 * v_gamma_range_FOV);
         }       
 
         // Convert array to vector
@@ -634,7 +616,6 @@ namespace wfi_from_depth_sensor
         wfi_from_depth_sensor::FourierCoefsMsg v_wfi_ctrl_cmd_msg;
 
         v_wfi_ctrl_cmd_msg.header.stamp = ros::Time::now();
-        v_wfi_ctrl_cmd_msg.a_0 = v_a_0;
         v_wfi_ctrl_cmd_msg.a = v_a_vector;
         v_wfi_ctrl_cmd_msg.b = v_b_vector;
 
@@ -657,16 +638,12 @@ namespace wfi_from_depth_sensor
         // Reference velocity
         float h_v_0 = 0.5;
 
-        // Fourier coefficient
-        float h_a_1 = h_a[0];
-        float h_a_2 = h_a[1];
-
         // Min and max forward velocity limits
         float h_v_min = 0.1;
         float h_v_max = 2.0;
 
         // Forward velocity control law
-        wfi_forward_velocity_control = 1 - h_v_max * (h_a_0 - h_a_2);
+        wfi_forward_velocity_control = 1 - h_v_max * (h_a_0 - h_a[2]);
 
         // Saturate forward velocity command
         if(wfi_forward_velocity_control < h_v_min)
@@ -688,11 +665,7 @@ namespace wfi_from_depth_sensor
         // Yaw angle gain
         float h_K_2 =  0.5; // 0.575;
 
-        // Fourier coefficient
-        float h_b_1 = h_b[0];
-        float h_b_2 = h_b[1];
-
-        wfi_yaw_rate_control = h_K_1 * h_b_1 + h_K_2 * h_b_2;
+        wfi_yaw_rate_control = h_K_1 * h_b[1] + h_K_2 * h_b[2];
 
         // Min and max yaw rate limits
         float yaw_rate_min = -2.0;
@@ -792,7 +765,7 @@ namespace wfi_from_depth_sensor
         const float g_a1 = 1/0.015; // 1/0.04;
 
         float h0 = g_i0 * (i0 - i0_0); // Opening Indicator
-        float h1 = g_a1 * (h_a_1 - a1_0); // Dead End Indicator
+        float h1 = g_a1 * (h_a[1] - a1_0); // Dead End Indicator
 
         // ***** THIS IS NOT ROBUST (FALSE POSITIVES/NEGATIVES) ***
         wfi_junctionness.data = h0 - h1; // If(J > 0.5)-->Opening // If(J < -0.5)-->Dead End 
@@ -869,7 +842,7 @@ namespace wfi_from_depth_sensor
         const float g_a1 = 1/0.015; // 1/0.04;
 
         float h0 = g_i0 * (i0 - i0_0); // Opening Indicator
-        float h1 = g_a1 * (h_a_1 - a1_0); // Dead End Indicator
+        float h1 = g_a1 * (h_a[1] - a1_0); // Dead End Indicator
 
         // ***** THIS IS NOT ROBUST (FALSE POSITIVES/NEGATIVES) ***
         wfi_junctionness.data = h0 - h1; // If(J > 0.5)-->Opening // If(J < -0.5)-->Dead End 

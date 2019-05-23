@@ -117,7 +117,7 @@
     </include>
 
      <node pkg="nodelet" type="nodelet" name="register_depth"
-            args="load depth_image_proc/register $(arg manager) $(arg bond)" respawn="$(arg respawn)">
+            args="load depth_wfi_from_depth_sensor/register $(arg manager) $(arg bond)" respawn="$(arg respawn)">
         <remap from="rgb/camera_info"             to="$(arg rgb)/camera_info" />
         <remap from="depth/camera_info"           to="$(arg depth)/camera_info" />
         <remap from="depth/image_rect"            to="$(arg depth)/image_rect_raw" />
@@ -126,7 +126,7 @@
 
       <!-- Publish registered XYZRGB point cloud with software registered input -->
       <node pkg="nodelet" type="nodelet" name="points_xyzrgb_sw_registered"
-            args="load depth_image_proc/point_cloud_xyzrgb $(arg manager) $(arg bond)" respawn="$(arg respawn)">
+            args="load depth_wfi_from_depth_sensor/point_cloud_xyzrgb $(arg manager) $(arg bond)" respawn="$(arg respawn)">
         <remap from="rgb/image_rect_color"        to="$(arg rgb)/image_rect_color" />
         <remap from="rgb/camera_info"             to="$(arg rgb)/camera_info" />
         <remap from="depth_registered/image_rect" to="$(arg depth_registered_filtered)/sw_registered/image_rect_raw" />
@@ -135,7 +135,7 @@
 
       <!-- Publish registered XYZRGB point cloud with hardware registered input (ROS Realsense depth alignment) -->
       <node pkg="nodelet" type="nodelet" name="points_xyzrgb_hw_registered"
-            args="load depth_image_proc/point_cloud_xyzrgb $(arg manager) $(arg bond)" respawn="$(arg respawn)">
+            args="load depth_wfi_from_depth_sensor/point_cloud_xyzrgb $(arg manager) $(arg bond)" respawn="$(arg respawn)">
         <remap from="rgb/image_rect_color"        to="$(arg rgb)/image_rect_color" />
         <remap from="rgb/camera_info"             to="$(arg rgb)/camera_info" />
         <remap from="depth_registered/image_rect" to="$(arg depth_registered)/image_raw" />
@@ -164,8 +164,8 @@
 
       <!-- Gene's WFI Nodelet -->
       <node pkg="nodelet" type="nodelet" output="screen"
-        args="load image_proc/scan $(arg manager) $(arg bond)" respawn="$(arg respawn)"
-        name="image_proc_scan">
+        args="load wfi_from_depth_sensor/scan $(arg manager) $(arg bond)" respawn="$(arg respawn)"
+        name="wfi_from_depth_sensor_scan">
         
         <!-- Parameters for Horizontal Laserscan -->
         <param name="h_x_offset" type="int" value="30" />   <!-- cropped 0-640 to 30-610 -->
