@@ -1,11 +1,10 @@
 <library path="lib/libwfi_from_depth_sensor">
 
-  <class name="wfi_from_depth_sensor/scan"
+  <class name="wfi_from_depth_sensor/wfi_from_depth_sensor_nodelet"
          type="wfi_from_depth_sensor::ScanNodelet"
          base_class_type="nodelet::Nodelet">
     <description>
-      Nodelet to create horizontal and vertical scans based to a raw camera
-      image post-capture.
+      Nodelet to take in depth sensor data and compute Wide Field Integration coefficients.
     </description>
   </class>
 

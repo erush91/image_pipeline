@@ -35,7 +35,7 @@ generate_messages(DEPENDENCIES
 
 # Dynamic reconfigure support
 generate_dynamic_reconfigure_options(
-        cfg/Scan.cfg)
+	cfg/WfiFromDepthSensor.cfg)
 
 catkin_package(
         CATKIN_DEPENDS
@@ -59,7 +59,7 @@ add_definitions(-DOPENCV_TRAITS_ENABLE_DEPRECATED)
 
 # Nodelet library
 add_library(${PROJECT_NAME} src/libwfi_from_depth_sensor/processor.cpp
-				src/nodelets/scan.cpp
+				src/nodelets/wfi_from_depth_sensor_nodelet.cpp
 				src/libwfi_from_depth_sensor/advertisement_checker.cpp	
 )
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg ${PROJECT_NAME}_generate_messages_cpp)

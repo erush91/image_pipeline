@@ -7,7 +7,7 @@ import rospy
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float32MultiArray
 from geometry_msgs.msg import Twist
-from image_proc.msg import FourierCoefsMsg
+from wfi_from_depth_sensor.msg import FourierCoefsMsg
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -53,11 +53,11 @@ def nearness_cb( msg ):
 def wfi_fourier_coeffs_cb(msg):
     global a_0, a_1, a_2, b_1, b_2
     """ Process the Fourier coefficients """
-    a_0 = msg.a_0
-    a_1 = msg.a[0]
-    a_2 = msg.a[1]
-    b_1 = msg.b[0]
-    b_2 = msg.b[1]
+    a_0 = msg.a[0]
+    a_1 = msg.a[1]
+    a_2 = msg.a[2]
+    b_1 = msg.b[1]
+    b_2 = msg.b[2]
     
     a_0_history.pop(0)
     a_1_history.pop(0)

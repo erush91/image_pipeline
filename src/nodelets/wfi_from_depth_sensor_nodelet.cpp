@@ -42,7 +42,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <dynamic_reconfigure/server.h>
 #include <cv_bridge/cv_bridge.h>
-#include <wfi_from_depth_sensor/ScanConfig.h>
+#include <wfi_from_depth_sensor/WfiFromDepthSensorConfig.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
 
@@ -53,7 +53,7 @@
 #include <std_msgs/Float32.h>
 #include <geometry_msgs/Twist.h>
 
-#include <wfi_from_depth_sensor/scan.h>
+#include <wfi_from_depth_sensor/wfi_from_depth_sensor.h>
 
 namespace wfi_from_depth_sensor
 {
@@ -511,7 +511,7 @@ namespace wfi_from_depth_sensor
                 h_gamma_arr[j] = h_gamma_start_FOV + h_gamma_delta_FOV * j;
                 h_cos_gamma_arr[i][j] = cos(i * h_gamma_arr[j]);
                 h_sin_gamma_arr[i][j] = sin(i * h_gamma_arr[j]);
-            }           
+            }
             h_a[i] = h_nearness.dot(h_cos_gamma_mat.row(i)) * h_gamma_delta_FOV / (0.5 * h_gamma_range_FOV);
             h_b[i] = h_nearness.dot(h_sin_gamma_mat.row(i)) * h_gamma_delta_FOV / (0.5 * h_gamma_range_FOV);
         }

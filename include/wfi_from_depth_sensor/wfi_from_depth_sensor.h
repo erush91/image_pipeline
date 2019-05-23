@@ -41,7 +41,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <dynamic_reconfigure/server.h>
 #include <cv_bridge/cv_bridge.h>
-#include <wfi_from_depth_sensor/ScanConfig.h>
+#include <wfi_from_depth_sensor/WfiFromDepthSensorConfig.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
 
@@ -92,7 +92,7 @@ class ScanNodelet : public nodelet::Nodelet
   
   // Dynamic reconfigure
   boost::recursive_mutex config_mutex_;
-  typedef wfi_from_depth_sensor::ScanConfig Config;
+  typedef wfi_from_depth_sensor::WfiFromDepthSensorConfig Config;
   typedef dynamic_reconfigure::Server<Config> ReconfigureServer;
   boost::shared_ptr<ReconfigureServer> reconfigure_server_;
   Config config_;
